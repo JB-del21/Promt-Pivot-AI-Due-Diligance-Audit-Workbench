@@ -1,0 +1,6 @@
+{
+  "name": "Prompt & Pivot: AI Due Diligence Audit Workbench",
+  "description": "Professzionális M&A és pénzügyi átvilágítási auditfelület a kritikus gondolkodás és adathitelesítés fejlesztésére. Ismerd fel az AI által generált elemzésekben a rejtett numerikus hibákat, ellentmondásokat és hallucinációkat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
