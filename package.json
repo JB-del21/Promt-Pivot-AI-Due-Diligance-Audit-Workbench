@@ -11,7 +11,7 @@
     "clean": "rm -rf dist server.js",
     "test": "npm run test:unit && npm run test:db",
     "lint": "tsc --noEmit",
-    "test:unit": "tsx --test src/utils/auditScoring.test.ts src/utils/scenarioMath.test.ts src/security/auth.test.ts src/security/reportIntegrity.test.ts src/security/api.integration.test.ts",
+    "test:unit": "tsx --test src/utils/auditScoring.test.ts src/utils/scenarioMath.test.ts src/security/auth.test.ts src/security/supabaseAuth.test.ts src/security/reportIntegrity.test.ts src/security/api.integration.test.ts",
     "test:db": "tsx --test src/security/db.integration.test.ts"
   },
   "dependencies": {
