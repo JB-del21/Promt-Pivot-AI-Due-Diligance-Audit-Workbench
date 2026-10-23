@@ -39,7 +39,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
   onOpenBenchmark,
   onOpenCohort,
 }) => {
-  const { setIsAndroidModalOpen } = useAudit();
+  const { setIsAndroidModalOpen, serverSync } = useAudit();
   const [copied, setCopied] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
 
@@ -114,6 +114,9 @@ ${evaluation.detailedMatches
   return (
     <div className="flex-1 bg-neutral-950 overflow-y-auto overflow-x-hidden px-3 sm:px-6 py-6 sm:py-8 lg:px-12 select-text w-full max-w-full">
       <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 print-page w-full max-w-full">
+        <div role="status" className={`rounded-lg border px-3 py-2 text-xs ${serverSync.state === 'PERSISTED' ? 'border-emerald-700 text-emerald-300' : serverSync.state === 'FAILED' ? 'border-red-700 text-red-300' : 'border-amber-700 text-amber-300'}`}>
+          {serverSync.message}
+        </div>
         {/* Actions Bar (hidden on print) */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-neutral-900 border border-neutral-800 no-print w-full max-w-full overflow-hidden">
           <div className="flex items-center gap-2 min-w-0">
