@@ -54,7 +54,7 @@ export const AuditHistoryModal: React.FC = () => {
                 Audit Előzmények & SHA-256 Tanúsítványok
               </h2>
               <p className="text-xs text-neutral-400">
-                A helyi böngészőben tárolt, kanonikus SHA-256 lenyomattal hitelesített korábbi auditok logja.
+                A helyi böngészőben tárolt, SHA-256 lenyomattal ellátott, nem hitelesített helyi gyakorlóeredmények.
               </p>
             </div>
           </div>
@@ -97,7 +97,7 @@ export const AuditHistoryModal: React.FC = () => {
             </div>
 
             <div className="text-xs text-neutral-400 border-t sm:border-t-0 sm:border-l border-neutral-800 pt-2 sm:pt-0 sm:pl-4">
-              <span className="text-neutral-500 block text-[10px]">Hitelesített audit rekordok:</span>
+              <span className="text-neutral-500 block text-[10px]">Helyi gyakorlóeredmények:</span>
               <span className="font-mono text-emerald-400 font-bold text-sm">
                 {pastAuditHistory.length} db tanúsítvány
               </span>
@@ -110,7 +110,7 @@ export const AuditHistoryModal: React.FC = () => {
               <ShieldCheck className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
               <p className="text-sm font-medium text-neutral-300">Nincs még elmentett audit rekord.</p>
               <p className="text-xs text-neutral-500 max-w-md mx-auto mt-1">
-                Végezz el egy átvilágítást a Munkalapon, nyomd meg az „Audit Lezárása” gombot, és az eredmény automatikusan bekerül a SHA-256 által hitelesített helyi előzményekbe.
+                Végezz el egy átvilágítást a Munkalapon, nyomd meg az „Audit Lezárása” gombot, és az eredmény automatikusan bekerül a helyi előzményekbe (szerveroldali hitelesítés nélkül).
               </p>
             </div>
           ) : (
@@ -198,7 +198,7 @@ export const AuditHistoryModal: React.FC = () => {
                     <span className="truncate">SHA-256: {item.sha256Hash}</span>
                     <span className="ml-auto text-[10px] text-emerald-400 flex items-center gap-1 shrink-0 font-sans font-medium">
                       <CheckCircle className="w-3 h-3" />
-                      Hitelesítve
+                      Helyben mentve · nem hitelesített
                     </span>
                   </div>
                 </div>
