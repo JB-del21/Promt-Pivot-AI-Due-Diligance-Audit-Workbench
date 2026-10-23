@@ -10,6 +10,7 @@ import type { CohortAnalysisData, CohortParticipant, FaultDetectionStatus } from
 import { saveAuditReportToDb, fetchAuditReportsFromDb, executeQuery, consumeBenchmarkQuota } from './src/db/client';
 import { verifyAccessToken } from './src/security/auth';
 import { verifyStoredReport } from './src/security/reportIntegrity';
+import { verifySupabaseBearer } from './src/security/supabaseAuth';
 
 dotenv.config();
 
@@ -31,11 +32,24 @@ declare global {
 }
 
 // Protected routes require issuer-signed RS256 JWTs. Never trust x-tenant-id.
-const requireApiAuth = (req: Request,res: Response,next: NextFunction) => {
- const auth=verifyAccessToken(req.headers.authorization,{publicKey:process.env.AUTH_JWT_PUBLIC_KEY,issuer:process.env.AUTH_JWT_ISSUER,audience:process.env.AUTH_JWT_AUDIENCE});
- if (auth.ok === false) return res.status(auth.status).json({ error: auth.error });
- req.tenantId=auth.principal.tenantId; next();
+const requireApiAuth = async (req: Request, res: Response, next: NextFunction) => {
+ try {
+  const auth = process.env.AUTH_PROVIDER === 'supabase'
+    ? await verifySupabaseBearer(req.headers.authorization, process.env.SUPABASE_URL)
+    : verifyAccessToken(req.headers.authorization,{
+        publicKey:process.env.AUTH_JWT_PUBLIC_KEY,
+        issuer:process.env.AUTH_JWT_ISSUER,
+        audience:process.env.AUTH_JWT_AUDIENCE,
+      });
+  if (auth.ok === false) return res.status(auth.status).json({ error: auth.error });
+  req.tenantId = auth.principal.tenantId;
+  next();
+ } catch { res.status(503).json({ error: 'Identity service unavailable' }); }
 };
+app.get('/api/session', requireApiAuth, (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ tenantId: req.tenantId, authenticated: true });
+});
 app.use('/api/reports',requireApiAuth);
 app.use('/api/cohort',requireApiAuth);
 app.use('/api/benchmark/run',requireApiAuth);
