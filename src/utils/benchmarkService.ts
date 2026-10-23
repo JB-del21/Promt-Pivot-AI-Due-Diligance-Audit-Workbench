@@ -1,3 +1,4 @@
+import { authenticatedFetch } from '../auth/client';
 import type { BenchmarkModelProfile, CohortMetrics } from '../types/benchmark';
 import type { Scenario, EvaluationResult } from '../types/audit';
 
@@ -36,7 +37,7 @@ export async function runLiveAIBenchmark(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 16000);
 
-  const res = await fetch('/api/benchmark/run', {
+  const res = await authenticatedFetch('/api/benchmark/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -61,7 +62,7 @@ export async function fetchCohortMetrics(): Promise<CohortMetrics | null> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    const res = await fetch('/api/cohort/metrics', { signal: controller.signal });
+    const res = await authenticatedFetch('/api/cohort/metrics', { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (!res.ok) return null;
