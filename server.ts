@@ -33,7 +33,7 @@ declare global {
 // Protected routes require issuer-signed RS256 JWTs. Never trust x-tenant-id.
 const requireApiAuth = (req: Request,res: Response,next: NextFunction) => {
  const auth=verifyAccessToken(req.headers.authorization,{publicKey:process.env.AUTH_JWT_PUBLIC_KEY,issuer:process.env.AUTH_JWT_ISSUER,audience:process.env.AUTH_JWT_AUDIENCE});
- if(!auth.ok) return res.status(auth.status).json({error:auth.error});
+ if (auth.ok === false) return res.status(auth.status).json({ error: auth.error });
  req.tenantId=auth.principal.tenantId; next();
 };
 app.use('/api/reports',requireApiAuth);
