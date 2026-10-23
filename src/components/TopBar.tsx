@@ -17,6 +17,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
+import { AuthPanel } from '../auth/AuthPanel';
 
 export const TopBar: React.FC = () => {
   const {
@@ -220,6 +221,7 @@ export const TopBar: React.FC = () => {
 
         {/* Zone 3: Primary Action & Profile Info */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <AuthPanel />
           {/* Active Profile Badge */}
           <button
             onClick={() => setIsHistoryModalOpen(true)}
