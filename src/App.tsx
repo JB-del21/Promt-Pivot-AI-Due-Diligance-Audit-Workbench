@@ -117,11 +117,12 @@ export default function App() {
   };
 
   // Submit and evaluate audit
-  const handleSubmitAudit = () => {
-    const result = evaluateAudit(
+  const handleSubmitAudit = async () => {
+    const result = await evaluateAudit(
       currentScenario.injected_errors,
       annotations,
-      elapsedSeconds
+      elapsedSeconds,
+      currentScenario.scenario_id
     );
     setEvaluation(result);
   };

@@ -17,9 +17,11 @@ export interface PodcastPillar {
 export const PODCAST_METADATA = {
   title: 'Mit ér a diploma, ha az AI már tudja a válaszokat?',
   show: 'Világgazdaság – A nagy AI-sztori podcast',
+  archivalSource: 'Világgazdaság (VG.hu) Hivatalos Podcast Archívum, 2024. november 28. (Epizód: A felsőoktatás jövője és az AI-korszak diplomája)',
+  recordingContext: 'Stúdióbeszélgetés az AI munkaerőpiaci hatásairól, a Gábor Dénes Egyetem transzparens AI-szabályozásáról és a számonkérési reformokról.',
   guests: [
-    { name: 'Dr. Dietz Ferenc', title: 'Egyetemi tanár, intézményvezető' },
-    { name: 'Dr. Aczél Petra', title: 'Kommunikációkutató, egyetemi tanár' },
+    { name: 'Dr. Dietz Ferenc', title: 'elnök, Gábor Dénes Egyetem (GDE), korábbi intézményvezető' },
+    { name: 'Dr. Aczél Petra', title: 'kommunikációkutató, egyetemi tanár (MOME / Corvinus)' },
   ],
   coreThesis:
     'A generatív mesterséges intelligencia korában a lexikális tudás önmagában leértékelődött. A valódi érték a kritikus gondolkodásban, az adatok validálásában, a rejtett hibák kiszűrésében és a felelős döntéshozatalban rejlik.',

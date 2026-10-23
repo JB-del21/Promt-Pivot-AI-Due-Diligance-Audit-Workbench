@@ -11,9 +11,12 @@ import {
   XCircle,
   FileCheck,
   Award,
+  Key,
+  Lock,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import type { Scenario, EvaluationResult } from '../types/audit';
-import { ERROR_TYPE_LABELS } from '../types/audit';
 
 interface AuditReportViewProps {
   scenario: Scenario;
@@ -29,26 +32,27 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
   onSelectNextScenario,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [showPayload, setShowPayload] = useState(false);
 
   const getReliabilityBadge = (rank: string) => {
     switch (rank) {
-      case 'Senior Due Diligence Auditor':
+      case 'Senior szintű elemzői teljesítmény':
         return {
-          label: 'Senior Due Diligence Auditor (Kiváló)',
+          label: 'Senior szintű elemzői teljesítmény (Kiváló)',
           color: 'text-emerald-400',
           bg: 'bg-emerald-500/10',
           border: 'border-emerald-500/30',
         };
-      case 'Associate Auditor':
+      case 'Gyakorlott auditor (Associate szint)':
         return {
-          label: 'Associate Auditor (Megfelelt)',
+          label: 'Gyakorlott auditor (Associate szint)',
           color: 'text-amber-400',
           bg: 'bg-amber-500/10',
           border: 'border-amber-500/30',
         };
       default:
         return {
-          label: 'Risk-Prone / Unverified (Fokozott Kockázat)',
+          label: 'Fokozott kockázat / Hiányos indoklás',
           color: 'text-rose-400',
           bg: 'bg-rose-500/10',
           border: 'border-rose-500/30',
@@ -66,7 +70,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(evaluation, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `audit_report_${evaluation.generatedHash}.json`);
+    downloadAnchor.setAttribute('download', `audit_report_${evaluation.canonicalHash.replace('SHA256:', '').slice(0, 12)}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -76,10 +80,12 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
     const md = `# AI Due Diligence Audit Report
 **Dokumentum:** ${scenario.meta.title}
 **Célvállalat:** ${scenario.context.target_name}
-**Audit Hash:** ${evaluation.generatedHash}
+**Audit SHA-256 Hash:** ${evaluation.canonicalHash}
 **Dátum:** ${evaluation.submittedAt}
 **Minősítés:** ${evaluation.auditorReliability}
 **Összpontszám:** ${evaluation.totalScore} / ${evaluation.maxPossibleScore} pont
+- **Detektálás & Kategória (Discovery):** ${evaluation.discoveryScore} pont
+- **Érdemi Indoklás & Helyesbítés (Analysis):** ${evaluation.analysisScore} pont
 **Precizitás:** ${evaluation.precision}% | **Lefedettség:** ${evaluation.recall}%
 **Téves riasztások (False Positives):** ${evaluation.falsePositivesCount}
 
@@ -87,7 +93,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
 ${evaluation.detailedMatches
   .map(
     (m, i) =>
-      `### #${i + 1} ${m.status} (${m.scoreAwarded > 0 ? `+${m.scoreAwarded}` : m.scoreAwarded} pont)\n- **Megállapítás:** ${m.feedbackNotes}\n`
+      `### #${i + 1} ${m.status} (${m.scoreAwarded > 0 ? `+${m.scoreAwarded}` : m.scoreAwarded} pont)\n- **Megállapítás:** ${m.feedbackNotes}\n${m.justificationFeedback ? `- **Indoklás értékelése:** ${m.justificationFeedback}\n` : ''}${m.correctionFeedback ? `- **Helyesbítés:** ${m.correctionFeedback}\n` : ''}`
   )
   .join('\n')}
 `;
@@ -106,8 +112,8 @@ ${evaluation.detailedMatches
             <span className="text-xs font-semibold text-neutral-200">
               Audit Kiértékelés Elkészült
             </span>
-            <span className="text-xs font-mono text-neutral-500">
-              · {evaluation.generatedHash}
+            <span className="text-xs font-mono text-neutral-500 truncate max-w-[220px]" title={evaluation.canonicalHash}>
+              · {evaluation.canonicalHash}
             </span>
           </div>
 
@@ -156,8 +162,14 @@ ${evaluation.detailedMatches
               </p>
             </div>
 
-            <div className="text-right sm:text-right font-mono text-xs space-y-1">
-              <div className="text-neutral-400">Audit Hash: <span className="text-neutral-200 font-bold">{evaluation.generatedHash}</span></div>
+            <div className="text-left sm:text-right font-mono text-xs space-y-1">
+              <div className="text-neutral-400 flex items-center gap-1 sm:justify-end">
+                <Lock className="w-3 h-3 text-emerald-400" />
+                <span>SHA-256 Hash:</span>
+              </div>
+              <div className="text-emerald-400 font-bold text-[11px] truncate max-w-[280px]" title={evaluation.canonicalHash}>
+                {evaluation.canonicalHash}
+              </div>
               <div className="text-neutral-400">Dátum: <span className="text-neutral-300">{evaluation.submittedAt}</span></div>
               <div className="text-neutral-400">Időtartam: <span className="text-neutral-300">{Math.floor(evaluation.elapsedSeconds / 60)}p {evaluation.elapsedSeconds % 60}mp</span></div>
             </div>
@@ -185,7 +197,7 @@ ${evaluation.detailedMatches
 
             <div>
               <span className="text-[10px] uppercase font-mono text-neutral-400 block mb-1">
-                Detektálási Precizitás (Precision)
+                Detektálási Precizitás
               </span>
               <span className="text-xl font-bold font-mono text-neutral-100">
                 {evaluation.precision}%
@@ -202,7 +214,34 @@ ${evaluation.detailedMatches
             </div>
           </div>
 
-          {/* Breakdown Pills Row */}
+          {/* Sub-Score Analysis Strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-lg bg-neutral-950/70 border border-neutral-800 font-mono text-xs">
+            <div className="p-3 bg-neutral-900/60 rounded border border-neutral-800">
+              <span className="text-[10px] uppercase text-neutral-400 block mb-0.5">
+                1. Felismerés & Kategória (Discovery)
+              </span>
+              <span className="text-base font-bold text-neutral-200">
+                {evaluation.discoveryScore} pont
+              </span>
+              <span className="text-[11px] text-neutral-400 block mt-0.5">
+                Szöveghelyes kijelölések és hibatípus besorolás
+              </span>
+            </div>
+
+            <div className="p-3 bg-neutral-900/60 rounded border border-neutral-800">
+              <span className="text-[10px] uppercase text-neutral-400 block mb-0.5">
+                2. Szakmai Elemzés & Korrekció (Analysis)
+              </span>
+              <span className="text-base font-bold text-neutral-200">
+                {evaluation.analysisScore} pont
+              </span>
+              <span className="text-[11px] text-neutral-400 block mt-0.5">
+                Érdemi indoklások és számszaki/ténybeli javítások
+              </span>
+            </div>
+          </div>
+
+          {/* Breakdown Counts Row */}
           <div className="flex flex-wrap items-center gap-6 text-xs font-mono text-neutral-400 border-b border-neutral-800/80 pb-4">
             <div>
               Helyes találatok: <strong className="text-emerald-400">{evaluation.truePositivesCount}</strong>
@@ -218,6 +257,35 @@ ${evaluation.detailedMatches
             </div>
           </div>
 
+          {/* RFC 8785 Canonical JSON + SHA-256 Integrity Checksum Card */}
+          <div className="p-4 rounded-lg bg-neutral-950 border border-neutral-800 text-xs space-y-3 no-print">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span className="font-semibold text-neutral-200 font-mono">
+                  Sértetlenségi Ellenőrző Összeg (RFC 8785 Canonical JSON + SHA-256)
+                </span>
+              </div>
+              <button
+                onClick={() => setShowPayload(!showPayload)}
+                className="text-[11px] font-mono text-neutral-400 hover:text-neutral-200 flex items-center gap-1 transition-colors"
+              >
+                <span>{showPayload ? 'Kanonikus JSON elrejtése' : 'Kanonikus JSON megtekintése'}</span>
+                {showPayload ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            </div>
+
+            <p className="text-[11px] text-neutral-400 leading-relaxed font-sans">
+              A jelentés ellenőrző összege determinisztikusan generált, kulcsrendezett RFC 8785 kanonikus JSON struktúrára épül, amely a pontszámokat, a szöveges indoklásokat, a korrekciókat, a minősítést és az időbélyeget rögzíti. Bármilyen utólagos módosítás megváltoztatja a SHA-256 lenyomatot. (Megjegyzés: Kliensoldali sértetlenség-ellenőrzés; harmadik fél előtti joghatáshoz szerveroldali PKI/HMAC aláírás szükséges.)
+            </p>
+
+            {showPayload && (
+              <pre className="p-3 bg-neutral-900 border border-neutral-800 rounded font-mono text-[10px] text-neutral-300 overflow-x-auto whitespace-pre-wrap select-all">
+                {evaluation.canonicalPayload}
+              </pre>
+            )}
+          </div>
+
           {/* Detailed Findings Table */}
           <section className="space-y-4">
             <h2 className="text-sm font-semibold text-neutral-100 uppercase tracking-wider font-mono">
@@ -226,18 +294,17 @@ ${evaluation.detailedMatches
 
             <div className="space-y-3">
               {evaluation.detailedMatches.map((item, idx) => {
-                const isSuccess = item.status === 'TRUE_POSITIVE';
                 const isPartial = item.status === 'PARTIAL_MATCH';
                 const isFalsePositive = item.status === 'FALSE_POSITIVE';
                 const isMissed = item.status === 'MISSED_ERROR';
 
                 let statusBadge = {
-                  text: 'HELYES AZONOSÍTÁS',
+                  text: 'HELYES AZONOSÍTÁS & ÉRVÉNYES ELEMZÉS',
                   color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
                 };
                 if (isPartial) {
                   statusBadge = {
-                    text: 'RÉSZPONTOZOTT (Kategória eltérés)',
+                    text: 'RÉSZLEGES PONT (Hiányos indoklás vagy kategória)',
                     color: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
                   };
                 } else if (isFalsePositive) {
@@ -255,7 +322,7 @@ ${evaluation.detailedMatches
                 return (
                   <div
                     key={idx}
-                    className="p-4 rounded-lg bg-neutral-950/70 border border-neutral-800 space-y-2 text-xs"
+                    className="p-4 rounded-lg bg-neutral-950/70 border border-neutral-800 space-y-2.5 text-xs"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -270,6 +337,24 @@ ${evaluation.detailedMatches
                         {item.scoreAwarded > 0 ? `+${item.scoreAwarded}` : item.scoreAwarded} pont
                       </span>
                     </div>
+
+                    {/* Score breakdown tags */}
+                    {item.scoreBreakdown && item.scoreAwarded > 0 && (
+                      <div className="flex flex-wrap gap-2 text-[10px] font-mono text-neutral-400">
+                        <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800">
+                          Felismerés: +{item.scoreBreakdown.phraseMatchScore}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800">
+                          Kategória: +{item.scoreBreakdown.categoryScore}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800">
+                          Indoklás: +{item.scoreBreakdown.justificationScore}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800">
+                          Helyesbítés: +{item.scoreBreakdown.correctionScore}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Target Phrase */}
                     {item.injectedError && (
@@ -291,13 +376,28 @@ ${evaluation.detailedMatches
                       {item.feedbackNotes}
                     </div>
 
+                    {/* Detailed feedback on justification and correction */}
+                    {item.justificationFeedback && (
+                      <div className="text-[11px] text-neutral-400 pt-1 border-t border-neutral-800/60 font-sans">
+                        <span className="text-neutral-300 font-mono text-[10px] uppercase block">Indoklás szakmai ellenőrzése:</span>
+                        {item.justificationFeedback}
+                      </div>
+                    )}
+
+                    {item.correctionFeedback && (
+                      <div className="text-[11px] text-neutral-400 pt-1 font-sans">
+                        <span className="text-neutral-300 font-mono text-[10px] uppercase block">Számszaki korrekció ellenőrzése:</span>
+                        {item.correctionFeedback}
+                      </div>
+                    )}
+
                     {item.userAnnotation?.justification && (
                       <div className="text-[11px] text-neutral-400 pt-1 border-t border-neutral-800/60">
-                        <span className="text-neutral-400 font-mono">Auditor saját indoklása: </span>
+                        <span className="text-neutral-400 font-mono">Auditor saját szöveges indoklása: </span>
                         "{item.userAnnotation.justification}"
                         {item.userAnnotation.proposedCorrection && (
                           <span className="block mt-0.5 text-neutral-300">
-                            → Javasolt korrekció: <strong className="font-mono">{item.userAnnotation.proposedCorrection}</strong>
+                            → Megadott korrekció: <strong className="font-mono">{item.userAnnotation.proposedCorrection}</strong>
                           </span>
                         )}
                       </div>
@@ -319,14 +419,14 @@ ${evaluation.detailedMatches
             <p className="text-neutral-400 leading-relaxed text-[12px]">
               {evaluation.totalScore >= 70
                 ? 'Kiváló döntéshozói és auditori teljesítmény. Képes voltál önállóan verifikálni a számításokat és szűrni a hallucinációkat, így a vezetői döntés biztonságos adatokon nyugodhat.'
-                : 'A vizsgálat során maradtak detektálatlan hibák vagy téves riasztások. Érdemes a referencia-kalkulátor használatával újraellenőrizni a numerikus összefüggéseket.'}
+                : 'A vizsgálat során maradtak detektálatlan hibák, hiányos indoklások vagy téves riasztások. A szakmai minősítéshez elengedhetetlen az állítások egzakt numerikus és forrásbeli bizonyítása.'}
             </p>
           </div>
 
           {/* Verification Stamp Footer */}
           <div className="pt-6 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 font-mono gap-2">
             <span>METHODOLOGY STAMP: GDE-DUE-DILIGENCE-V1</span>
-            <span>VERIFIED DIGITAL CHECKSUM: {evaluation.generatedHash}</span>
+            <span className="truncate max-w-[360px]" title={evaluation.canonicalHash}>VERIFIED CANONICAL HASH: {evaluation.canonicalHash}</span>
           </div>
         </article>
 

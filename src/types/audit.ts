@@ -1,5 +1,23 @@
 export type ErrorType = 'NUMERIC_MISMATCH' | 'LOGICAL_CONTRADICTION' | 'FABRICATED_SOURCE';
 
+export interface NumericTolerance {
+  expected: number;
+  min: number;
+  max: number;
+  unit: string;
+}
+
+export interface InjectedErrorValidation {
+  /** Keywords or key concepts that must be present in the user's justification */
+  required_keywords: string[];
+  /** Expected numerical range or exact string for the correction */
+  expected_correction: string;
+  /** Optional numeric tolerance parser for quantitative errors */
+  numeric_tolerance?: NumericTolerance;
+  /** Explanation of what an acceptable auditor justification must contain */
+  rationale_criteria: string;
+}
+
 export interface InjectedError {
   id: string;
   type: ErrorType;
@@ -8,6 +26,7 @@ export interface InjectedError {
   explanation: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
   points: number;
+  validation: InjectedErrorValidation;
 }
 
 export interface ScenarioMeta {
@@ -29,6 +48,7 @@ export interface Scenario {
     marketing_spend?: string;
     headcount?: number;
     churn_metric?: string;
+    accounting_methodology_note?: string;
     additional_kpis: Record<string, string>;
   };
   document_markdown: string;
@@ -48,29 +68,43 @@ export interface UserAnnotation {
   timestamp: number;
 }
 
+export interface MatchScoreBreakdown {
+  phraseMatchScore: number;    // Up to 35% of item points
+  categoryScore: number;       // Up to 25% of item points
+  justificationScore: number;  // Up to 25% of item points
+  correctionScore: number;     // Up to 15% of item points
+}
+
 export interface MatchDetail {
   errorId?: string;
   injectedError?: InjectedError;
   userAnnotation?: UserAnnotation;
   status: 'TRUE_POSITIVE' | 'PARTIAL_MATCH' | 'FALSE_POSITIVE' | 'MISSED_ERROR';
   scoreAwarded: number;
+  scoreBreakdown: MatchScoreBreakdown;
   feedbackNotes: string;
+  justificationFeedback?: string;
+  correctionFeedback?: string;
 }
 
 export interface EvaluationResult {
   totalScore: number;
   maxPossibleScore: number;
+  discoveryScore: number;   // Points from finding and categorizing
+  analysisScore: number;    // Points from justification and correction
   truePositivesCount: number;
   partialMatchesCount: number;
   falsePositivesCount: number;
   missedErrorsCount: number;
   precision: number; // 0 - 100
-  recall: number; // 0 - 100
-  auditorReliability: 'Senior Due Diligence Auditor' | 'Associate Auditor' | 'Risk-Prone / Unverified';
+  recall: number;    // 0 - 100
+  auditorReliability: 'Senior szintű elemzői teljesítmény' | 'Gyakorlott auditor (Associate szint)' | 'Fokozott kockázat / Hiányos indoklás';
   detailedMatches: MatchDetail[];
-  generatedHash: string;
+  canonicalHash: string; // True SHA-256 digest
+  canonicalPayload: string; // Canonical stringified JSON used for verification
   submittedAt: string;
   elapsedSeconds: number;
+  scenarioId: string;
 }
 
 export const ERROR_TYPE_LABELS: Record<ErrorType, { label: string; shortLabel: string; desc: string; color: string; bg: string; border: string }> = {

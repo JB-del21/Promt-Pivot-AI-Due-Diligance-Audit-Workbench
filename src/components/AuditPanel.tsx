@@ -126,6 +126,15 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
               </div>
             ))}
           </div>
+
+          {scenario.context.accounting_methodology_note && (
+            <div className="mt-3 p-2.5 rounded bg-neutral-950/90 border border-neutral-800 text-[11px] text-neutral-400 leading-relaxed font-sans">
+              <span className="text-amber-400/90 font-mono text-[10px] uppercase font-semibold block mb-0.5">
+                Számviteli módszertani elhatárolás:
+              </span>
+              {scenario.context.accounting_methodology_note}
+            </div>
+          )}
         </section>
 
         {/* Active Annotations Drawer */}
@@ -152,6 +161,9 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
               {annotations.map((ann, idx) => {
                 const meta = ERROR_TYPE_LABELS[ann.selectedType];
                 const isSelected = selectedAnnotationId === ann.id;
+                const justLen = ann.justification.trim().length;
+                const isJustShort = justLen > 0 && justLen < 20;
+                const hasCorrection = ann.proposedCorrection.trim().length > 0;
 
                 return (
                   <div
@@ -203,25 +215,42 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
 
                     {/* Justification input */}
                     <div className="space-y-1.5 select-text">
-                      <label className="text-[10px] font-mono text-neutral-400 block">
-                        Auditori indoklás (Miért hiba?):
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-mono text-neutral-400 block">
+                          Auditori indoklás (25% súlyozás, min. 20 karakter & 4 szó):
+                        </label>
+                        <span className={`text-[10px] font-mono ${justLen >= 20 ? 'text-emerald-400' : justLen > 0 ? 'text-amber-400' : 'text-neutral-500'}`}>
+                          {justLen}/20 betű
+                        </span>
+                      </div>
                       <textarea
                         value={ann.justification}
                         onChange={(e) =>
                           onUpdateAnnotation(ann.id, { justification: e.target.value })
                         }
-                        placeholder="pl. A megadott $12.4M ARR és $9.8M opex mellett az EBITDA 21.0%, nem 35.2%..."
+                        placeholder="pl. A megadott $12.4M ARR és $9.8M opex mellett az EBITDA $2.6M (20.97%), nem 35.2%..."
                         rows={2}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded px-2.5 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-600 resize-none font-sans"
+                        className={`w-full bg-neutral-950 border rounded px-2.5 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:outline-none resize-none font-sans ${
+                          isJustShort ? 'border-amber-500/50' : 'border-neutral-800 focus:border-neutral-600'
+                        }`}
                       />
+                      {isJustShort && (
+                        <p className="text-[10px] text-amber-400/90 font-mono">
+                          Még {20 - justLen} karakter szükséges az érvényes indokláshoz.
+                        </p>
+                      )}
                     </div>
 
                     {/* Suggested correction */}
                     <div className="space-y-1 select-text mt-2">
-                      <label className="text-[10px] font-mono text-neutral-400 block">
-                        Helyes adat / megoldás:
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-mono text-neutral-400 block">
+                          Helyesbítés / Tényadat (15% súlyozás):
+                        </label>
+                        {hasCorrection && (
+                          <span className="text-[10px] font-mono text-emerald-400">Rögzítve</span>
+                        )}
+                      </div>
                       <input
                         type="text"
                         value={ann.proposedCorrection}
@@ -244,11 +273,11 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
           <div className="p-3 rounded bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-400 space-y-1">
             <div className="flex items-center gap-1.5 text-neutral-300 font-medium">
               <AlertCircle className="w-3.5 h-3.5 text-neutral-400" />
-              <span>Auditori Protokoll:</span>
+              <span>4 Dimenziós Pontozási Motor:</span>
             </div>
-            <p>
-              Csak azt jelöld meg, amit a referencia-adatokkal vagy logikai érvekkel igazolni tudsz.
-              A téves riasztások csökkentik a Megbízhatósági Indexet.
+            <p className="leading-relaxed">
+              1. Kijelölés (35%) · 2. Kategória (25%) · 3. Szakmai indoklás (25%) · 4. Helyesbítés (15%).
+              A pontozó az érdemi érveket és a helyes számokat értékeli. Üres indoklással csak alappontszám szerezhető.
             </p>
           </div>
 
