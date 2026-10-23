@@ -149,7 +149,7 @@ export function extractNumbers(text: string): number[] {
 export function checkAdditiveEquations(text: string): { valid: boolean; checked: number } {
   const number = String.raw`(?:[$€]\s*)?(\d+(?:[.,]\d+)?)\s*[Mm]?`;
   const equations = new RegExp(
-    `${number}\\\\s*([-+])\\\\s*${number}(?:\\\\s*([-+])\\\\s*${number})?\\\\s*=\\\\s*${number}`,
+    `${number}\\s*([-+])\\s*${number}(?:\\s*([-+])\\s*${number})?\\s*=\\s*${number}`,
     'g'
   );
   const parse = (value: string) => Number(value.replace(',', '.'));
