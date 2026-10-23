@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Smartphone,
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 
@@ -36,6 +37,7 @@ export const TopBar: React.FC = () => {
     setIsBenchmarkModalOpen,
     setIsScenarioModalOpen,
     setIsHistoryModalOpen,
+    setIsAndroidModalOpen,
   } = useAudit();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -130,6 +132,19 @@ export const TopBar: React.FC = () => {
           >
             <History className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden lg:inline">Előzmények ({pastAuditHistory.length})</span>
+          </button>
+
+          {/* Android Mobile App & Emulator Trigger */}
+          <button
+            onClick={() => setIsAndroidModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all font-medium shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            title="Natív Android Mobil Alkalmazás & Élő Emulátor"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden lg:inline">Android App</span>
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-mono px-1 py-0.2 rounded uppercase">
+              Élő
+            </span>
           </button>
 
           <button
@@ -361,6 +376,19 @@ export const TopBar: React.FC = () => {
                   </div>
                   <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono">
                     {pastAuditHistory.length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleMobileNav(() => setIsAndroidModalOpen(true))}
+                  className="w-full flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-colors text-xs font-medium min-h-[44px]"
+                >
+                  <div className="flex items-center gap-3">
+                    <Smartphone className="w-4 h-4 text-emerald-400" />
+                    <span>Android Mobil App & Emulátor</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-300 font-mono uppercase bg-emerald-500/20 px-1.5 py-0.5 rounded font-bold">
+                    Élő
                   </span>
                 </button>
 

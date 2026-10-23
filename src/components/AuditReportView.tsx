@@ -17,8 +17,10 @@ import {
   ChevronUp,
   Cpu,
   Users,
+  Smartphone,
 } from 'lucide-react';
 import type { Scenario, EvaluationResult } from '../types/audit';
+import { useAudit } from '../context/AuditContext';
 
 interface AuditReportViewProps {
   scenario: Scenario;
@@ -37,6 +39,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
   onOpenBenchmark,
   onOpenCohort,
 }) => {
+  const { setIsAndroidModalOpen } = useAudit();
   const [copied, setCopied] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
 
@@ -159,6 +162,14 @@ ${evaluation.detailedMatches
                 <span className="truncate">Kohorsz Hőtérkép</span>
               </button>
             )}
+
+            <button
+              onClick={() => setIsAndroidModalOpen(true)}
+              className="flex-1 sm:flex-none min-w-[120px] flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all font-medium min-h-[38px] sm:min-h-0"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">Android Mobil App</span>
+            </button>
 
             <button
               onClick={handlePrint}

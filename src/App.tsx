@@ -15,6 +15,7 @@ import { ScenarioSelectorModal } from './components/ScenarioSelectorModal';
 import { SystemDocumentationModal } from './components/SystemDocumentationModal';
 import { AIBenchmarkModal } from './components/AIBenchmarkModal';
 import { AuditHistoryModal } from './components/AuditHistoryModal';
+import { AndroidAppModal } from './components/AndroidAppModal';
 import { AuditReportView } from './components/AuditReportView';
 import { CohortDashboardView } from './components/CohortDashboardView';
 
@@ -176,6 +177,7 @@ function WorkbenchContent() {
       />
 
       <AuditHistoryModal />
+      <AndroidAppModal />
     </div>
   );
 }

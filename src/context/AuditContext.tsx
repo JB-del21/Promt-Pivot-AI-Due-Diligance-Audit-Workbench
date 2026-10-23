@@ -45,6 +45,7 @@ interface AuditContextType {
   isScenarioModalOpen: boolean;
   isBenchmarkModalOpen: boolean;
   isHistoryModalOpen: boolean;
+  isAndroidModalOpen: boolean;
 
   // Actions
   selectScenario: (scenario: Scenario) => void;
@@ -69,6 +70,7 @@ interface AuditContextType {
   setIsScenarioModalOpen: (open: boolean) => void;
   setIsBenchmarkModalOpen: (open: boolean) => void;
   setIsHistoryModalOpen: (open: boolean) => void;
+  setIsAndroidModalOpen: (open: boolean) => void;
 }
 
 const STORAGE_KEY_SESSION = 'prompt_pivot_session_v2';
@@ -177,6 +179,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
   const [isBenchmarkModalOpen, setIsBenchmarkModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -235,6 +238,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setIsScenarioModalOpen(false);
         setIsBenchmarkModalOpen(false);
         setIsHistoryModalOpen(false);
+        setIsAndroidModalOpen(false);
         setSelectedAnnotationId(null);
       }
     };
@@ -391,6 +395,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         isScenarioModalOpen,
         isBenchmarkModalOpen,
         isHistoryModalOpen,
+        isAndroidModalOpen,
 
         selectScenario,
         selectScenarioById,
@@ -413,6 +418,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setIsScenarioModalOpen,
         setIsBenchmarkModalOpen,
         setIsHistoryModalOpen,
+        setIsAndroidModalOpen,
       }}
     >
       {children}
