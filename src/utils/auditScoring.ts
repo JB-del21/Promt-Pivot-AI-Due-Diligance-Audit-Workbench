@@ -24,13 +24,19 @@ export async function sha256(text: string): Promise<string> {
  * to produce a deterministic, tamper-evident string representation.
  */
 export function canonicalizeJson(obj: unknown): string {
+  if (typeof obj === 'number' && !Number.isFinite(obj)) {
+    throw new Error('canonicalizeJson: NaN/Infinity is not representable in RFC 8785 JSON');
+  }
+  if (obj === undefined) {
+    throw new Error('canonicalizeJson: undefined is not representable in RFC 8785 JSON');
+  }
   if (obj === null || typeof obj !== 'object') {
     return JSON.stringify(obj);
   }
   if (Array.isArray(obj)) {
     return '[' + obj.map((item) => canonicalizeJson(item)).join(',') + ']';
   }
-  const keys = Object.keys(obj).sort();
+  const keys = Object.keys(obj).filter((k) => (obj as Record<string, unknown>)[k] !== undefined).sort();
   const pairs = keys.map(
     (key) => `${JSON.stringify(key)}:${canonicalizeJson((obj as Record<string, unknown>)[key])}`
   );
@@ -93,17 +99,140 @@ export function checkPhraseMatchStrict(selected: string, target: string): boolea
   return jaccard >= 0.65;
 }
 
+// ---------------------------------------------------------------------------
+// Anti-gaming helpers (token / number based, no external dependencies)
+// ---------------------------------------------------------------------------
+
+/** Small Hungarian function-word list: these never count as domain evidence. */
+const STOP_WORDS = new Set([
+  'hogy', 'mert', 'mint', 'ezért', 'olyan', 'vagy', 'egy', 'azaz', 'amely', 'amelyek',
+  'miatt', 'szerint', 'alatt', 'között', 'lehet', 'nincs', 'volt', 'van', 'pedig', 'mivel',
+  'ahol', 'akkor', 'még', 'csak', 'nem', 'igen', 'ami', 'aki', 'azért', 'így', 'ezek',
+  'azok', 'által', 'után', 'előtt', 'nagyon', 'kell', 'valós', 'valami', 'során', 'sem',
+  'meg', 'már', 'ezt', 'azt', 'ebben', 'abban', 'illetve', 'tehát', 'viszont',
+]);
+
+export function tokenize(text: string): string[] {
+  return normalizeText(text).split(' ').filter((w) => w.length > 0);
+}
+
+/**
+ * Suffix-tolerant token comparison (Hungarian is agglutinative).
+ * - short reference tokens (<= 3 chars) must match exactly ("car" never matches "scarce")
+ * - long reference tokens (>= 7 chars) may lose their last two chars ("létezik" ~ "létező")
+ * - the user token must START with the (trimmed) reference token, never merely contain it
+ * - or be a stem (>= 6 chars) of the reference token
+ */
+export function tokenMatches(userTok: string, refTok: string): boolean {
+  if (refTok.length <= 3) return userTok === refTok;
+  const stem = refTok.length >= 7 ? refTok.slice(0, refTok.length - 2) : refTok;
+  if (userTok.startsWith(stem)) return true;
+  // the user may use a (reasonably long) stem of a compound/inflected reference word: "szabvány" ~ "szabványkötet"
+  return userTok.length >= 6 && refTok.startsWith(userTok);
+}
+
+/** Extracts every number from free text: handles 12,4 / 3,600,000 / "90 000" / "€3.6M" / "20.97%". */
+export function extractNumbers(text: string): number[] {
+  const cleaned = text
+    .replace(/(\d{1,3})((?:,\d{3})+)(?!\d)/g, (_m, a: string, b: string) => a + b.replace(/,/g, ''))
+    .replace(/(\d)[\s\u00a0](?=\d{3}(?!\d))/g, '$1')
+    .replace(/(\d),(?=\d)/g, '$1.');
+  const matches = cleaned.match(/(?:(?<![\d.])-)?\d+(?:\.\d+)?/g) ?? [];
+  return matches.map((m) => parseFloat(m)).filter((n) => Number.isFinite(n));
+}
+
+const NUMERIC_KEYWORD = /^-?\d+(?:[.,]\d+)?\s*%?$/;
+
+/**
+ * Returns the set of distinct "concept ids" from `keywords` that the text really contains.
+ * Numeric keywords match numbers (no substring hits: "140" does not contain "40"),
+ * textual keywords match whole tokens / token sequences (suffix-tolerant).
+ * Numeric variants of the same value ("21%" / "21.0%") collapse into one concept.
+ */
+export function matchKeywordConcepts(text: string, keywords: string[]): Set<string> {
+  const found = new Set<string>();
+  const nums = extractNumbers(text);
+  const toks = tokenize(text);
+
+  for (const kw of keywords) {
+    const trimmed = kw.trim();
+    if (NUMERIC_KEYWORD.test(trimmed)) {
+      const kwStr = trimmed.replace('%', '').replace(',', '.').trim();
+      const kwVal = parseFloat(kwStr);
+      const hasDecimals = kwStr.includes('.');
+      const hit = nums.some(
+        (n) => n === kwVal || (hasDecimals && String(n).startsWith(String(kwVal)) && n !== 0)
+      );
+      if (hit) {
+        // near-identical numbers (20.9 / 21 / 21.0) are the SAME idea, not two separate concepts
+        const close = Array.from(found).some((id) => {
+          if (!id.startsWith('n:')) return false;
+          const other = parseFloat(id.slice(2));
+          return Math.abs(other - kwVal) <= Math.max(0.1, 0.02 * Math.max(Math.abs(other), Math.abs(kwVal)));
+        });
+        if (!close) found.add(`n:${kwVal}`);
+      }
+      continue;
+    }
+    const kwToks = tokenize(trimmed);
+    if (kwToks.length === 0) continue;
+    for (let i = 0; i + kwToks.length <= toks.length; i++) {
+      if (kwToks.every((kt, j) => tokenMatches(toks[i + j], kt))) {
+        found.add(`t:${kwToks.join(' ')}`);
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+function contentTokens(text: string, minLen = 4): string[] {
+  return tokenize(text).filter((t) => t.length >= minLen && !STOP_WORDS.has(t) && !/^\d+$/.test(t));
+}
+
+/**
+ * Distinct context words (from the error's own target phrase / explanation / expected correction)
+ * that the text uses and that are NOT themselves required keywords.
+ */
+function groundingWordHits(text: string, keywords: string[], groundingText: string): Set<string> {
+  const kwToks = keywords.flatMap((k) => tokenize(k)).filter((t) => !/^\d+$/.test(t));
+  const isKeywordTok = (t: string) => kwToks.some((k) => tokenMatches(t, k));
+  const vocab = Array.from(new Set(contentTokens(groundingText, 5))).filter((v) => !isKeywordTok(v));
+
+  const hits = new Set<string>();
+  for (const t of contentTokens(text, 4)) {
+    if (isKeywordTok(t)) continue;
+    const v = vocab.find((vv) => tokenMatches(t, vv));
+    if (v) hits.add(v);
+  }
+  return hits;
+}
+
+/**
+ * "Grounding" = the answer is tied to THIS document/error, not just to the keyword list.
+ * Satisfied by a number that occurs in the error context, or by >= 2 distinct
+ * context words that are NOT themselves required keywords.
+ */
+function hasGrounding(text: string, keywords: string[], groundingText: string): boolean {
+  const ctxNums = extractNumbers(groundingText);
+  if (extractNumbers(text).some((n) => ctxNums.some((c) => Math.abs(c - n) < 1e-9))) return true;
+  return groundingWordHits(text, keywords, groundingText).size >= 2;
+}
+
 /**
  * Evaluates the substantive quality of the auditor's justification.
- * Enforces anti-bypass rules:
- * 1. Minimum length (>= 20 non-whitespace characters)
- * 2. Meaningful sentence structure (>= 4 words, >= 3 distinct words)
- * 3. Anti-junk / character entropy check (prevents repeated characters like 'aaaaaaaa')
- * 4. Concept requirement: at least 2 distinct domain keywords OR at least 1 keyword AND 1 numeric datum
+ * 1. >= 20 characters, >= 5 words (>= 4 distinct), >= 5 distinct characters
+ * 2. >= 2 DISTINCT required concepts, matched on token boundaries / numeric values
+ * 3. Grounding in the concrete error (context number or >= 2 context words beyond the keywords)
+ *
+ * NOTE: this is a heuristic. It raises the cost of gaming considerably but cannot prove
+ * reasoning quality; copying words from the document is still "answering". For high-stakes
+ * certification add a human or LLM rubric judge on top.
  */
 export function evaluateJustification(
   justification: string,
-  requiredKeywords: string[]
+  requiredKeywords: string[],
+  groundingText: string = ''
 ): { isValid: boolean; feedback: string } {
   const trimmed = justification.trim();
   if (trimmed.length < 20) {
@@ -114,48 +243,51 @@ export function evaluateJustification(
   }
 
   const normJust = normalizeText(trimmed);
-
-  // Anti-junk: character variety check (prevents single-letter repetition)
-  const nonWhitespaceChars = normJust.replace(/\s+/g, '');
-  const uniqueChars = new Set(nonWhitespaceChars);
-  if (uniqueChars.size < 5) {
+  if (new Set(normJust.replace(/\s+/g, '')).size < 5) {
     return {
       isValid: false,
       feedback: 'Érvénytelen indoklás: Értelmetlen vagy ismétlődő karakterekből álló bejegyzés.',
     };
   }
 
-  // Word count check
   const words = normJust.split(' ').filter((w) => w.length >= 2);
-  const uniqueWords = new Set(words);
-  if (words.length < 4 || uniqueWords.size < 3) {
+  if (words.length < 5 || new Set(words).size < 4) {
     return {
       isValid: false,
-      feedback: 'Hiányos mondatszerkezet: A szakmai indoklásnak összefüggő állításból kell állnia (legalább 4 szó szükséges).',
+      feedback: 'Hiányos mondatszerkezet: A szakmai indoklásnak összefüggő állításból kell állnia (legalább 5 szó szükséges).',
     };
   }
 
-  // Count distinct matching required keywords
-  const matchedKeywords = requiredKeywords.filter((kw) => {
-    const normKw = normalizeText(kw);
-    return normJust.includes(normKw);
-  });
-
-  // Check if a number/percentage is present
-  const hasNumber = /\d+(\.\d+)?%?/.test(trimmed);
-
-  // Must have at least 2 distinct keywords OR (1 keyword AND 1 number)
-  if (matchedKeywords.length === 0) {
+  const concepts = matchKeywordConcepts(trimmed, requiredKeywords);
+  if (concepts.size === 0) {
     return {
       isValid: false,
       feedback: 'Gyenge indoklás: Nem tartalmazza a szükséges pénzügyi/logikai kulcsfogalmakat.',
     };
   }
-
-  if (matchedKeywords.length < 2 && !hasNumber) {
+  if (concepts.size < 2) {
     return {
       isValid: false,
-      feedback: 'Felszínes indoklás: Egyetlen kulcsszó önmagában nem elég; fejtsd ki legalább két kulcsfogalommal vagy konkrét számadat és összefüggés bemutatásával.',
+      feedback: 'Felszínes indoklás: Legalább két különböző kulcsfogalom (vagy a releváns számadat és az összefüggés) bemutatása szükséges.',
+    };
+  }
+  // numbers alone are not an argument: without a verbal keyword concept the answer must at least
+  // use >= 2 concrete words of the document/error context to explain the connection
+  if (
+    groundingText &&
+    !Array.from(concepts).some((id) => id.startsWith('t:')) &&
+    groundingWordHits(trimmed, requiredKeywords, groundingText).size < 2
+  ) {
+    return {
+      isValid: false,
+      feedback: 'Hiányos indoklás: A számadatok mellett szavakkal is meg kell fogalmazni az összefüggést (pl. mi a hiba oka).',
+    };
+  }
+
+  if (groundingText && !hasGrounding(trimmed, requiredKeywords, groundingText)) {
+    return {
+      isValid: false,
+      feedback: 'Általános indoklás: Hivatkozz a dokumentum konkrét adatára vagy állítására (szám, vagy legalább két konkrét fogalom a szövegből), ne csak kulcsszavakat sorolj.',
     };
   }
 
@@ -166,10 +298,12 @@ export function evaluateJustification(
 }
 
 /**
- * Evaluates the auditor's proposed correction against numerical tolerance or concept string.
- * Strictly separates quantitative and qualitative error validation:
- * - If numeric tolerance exists: REQUIRES a numeric value within tolerance. Missing number returns false.
- * - If non-numeric: REQUIRES a specific domain concept/keyword match and rejects arbitrary junk text.
+ * Evaluates the auditor's proposed correction.
+ * - Numeric error (numeric_tolerance defined): a number is REQUIRED. The first or the LAST number of
+ *   the answer must fall inside [min, max] (so "12.4 - 9.8 = 2.6, azaz 20.97%" is accepted), and
+ *   number-dumping (> 6 numbers) is rejected.
+ * - Qualitative error: >= 3 words, >= 2 distinct concepts (at least one from expected_correction),
+ *   and a low share of words unrelated to the error ("lorem ipsum" padding fails).
  */
 export function evaluateCorrection(
   proposedCorrection: string,
@@ -184,66 +318,89 @@ export function evaluateCorrection(
   }
 
   const normProp = normalizeText(trimmed);
-
-  // Anti-junk check: reject repetitive characters
-  const nonWhitespaceChars = normProp.replace(/\s+/g, '');
-  const uniqueChars = new Set(nonWhitespaceChars);
-  if (uniqueChars.size < 3) {
+  if (new Set(normProp.replace(/\s+/g, '')).size < 3) {
     return {
       isValid: false,
       feedback: 'Érvénytelen korrekció: A megadott szöveg értelmetlen karakterhalmaz.',
     };
   }
 
-  const tolerance = injectedError.validation.numeric_tolerance;
+  const v = injectedError.validation;
+  const tolerance = v.numeric_tolerance;
 
-  // Case 1: Numeric error validation (Hard requirement for numeric input)
+  // Case 1: quantitative error
   if (tolerance) {
-    const match = trimmed.replace(',', '.').match(/-?\d+(\.\d+)?/);
-    if (!match) {
+    const nums = extractNumbers(trimmed);
+    if (nums.length === 0) {
       return {
         isValid: false,
         feedback: 'Hiányzó számszaki adat: A számszaki hibához kötelező konkrét korrigált számértéket megadni.',
       };
     }
-
-    const val = parseFloat(match[0]);
-    if (val >= tolerance.min && val <= tolerance.max) {
+    if (nums.length > 6) {
+      return {
+        isValid: false,
+        feedback: 'Érvénytelen korrekció: Túl sok számadat; egyetlen, egyértelmű korrigált értéket adj meg.',
+      };
+    }
+    const inRange = (n: number) => n >= tolerance.min && n <= tolerance.max;
+    const first = nums[0];
+    const last = nums[nums.length - 1];
+    if (inRange(first) || inRange(last)) {
+      const val = inRange(last) ? last : first;
       return {
         isValid: true,
         feedback: `Helyes számszaki korrekció: A megadott érték (${val}${tolerance.unit}) a számított tűréshatáron (${tolerance.min}-${tolerance.max}${tolerance.unit}) belül van.`,
       };
-    } else {
-      return {
-        isValid: false,
-        feedback: `Pontatlan számítás: A megadott ${val}${tolerance.unit} kívül esik az elfogadható határon (${tolerance.min}-${tolerance.max}${tolerance.unit}).`,
-      };
     }
-  }
-
-  // Case 2: Qualitative error validation (Concept matching without length-based fallback)
-  const normExp = normalizeText(injectedError.validation.expected_correction);
-  const stopWords = new Set(['hogy', 'mert', 'mint', 'ezért', 'nemzetközi', 'olyan', 'vagy', 'egy', 'valós', 'kell']);
-  const conceptWords = normExp
-    .split(' ')
-    .filter((w) => w.length >= 4 && !stopWords.has(w));
-
-  const matchedConceptWord = conceptWords.some((w) => normProp.includes(w));
-  const matchedRequiredKeyword = injectedError.validation.required_keywords.some((kw) => {
-    const normKw = normalizeText(kw);
-    return normProp.includes(normKw);
-  });
-
-  if (matchedConceptWord || matchedRequiredKeyword) {
     return {
-      isValid: true,
-      feedback: 'Megfelelő szakmai korrekciós javaslat: Az azonosított ténybeli eltérés helyesbítésre került.',
+      isValid: false,
+      feedback: `Pontatlan számítás: A megadott ${last}${tolerance.unit} kívül esik az elfogadható határon (${tolerance.min}-${tolerance.max}${tolerance.unit}).`,
     };
   }
 
-  return {
+  // Case 2: qualitative error
+  const userToks = tokenize(trimmed);
+  const userWords = userToks.filter((t) => t.length >= 2);
+  const fail = {
     isValid: false,
-    feedback: `A megadott korrekció nem fedi a valós tényt (${injectedError.validation.expected_correction}).`,
+    feedback: `A megadott korrekció nem fedi a valós tényt (${v.expected_correction}).`,
+  };
+  if (userWords.length < 3) return fail;
+
+  // concepts from expected_correction
+  const expToks = Array.from(new Set(contentTokens(v.expected_correction, 4)));
+  const expHits = new Set<string>();
+  for (const t of userToks) {
+    const e = expToks.find((ee) => tokenMatches(t, ee));
+    if (e) expHits.add(`e:${e}`);
+  }
+  const expNums = extractNumbers(v.expected_correction);
+  for (const n of extractNumbers(trimmed)) {
+    if (expNums.some((c) => Math.abs(c - n) < 1e-9)) expHits.add(`en:${n}`);
+  }
+  const kwHits = matchKeywordConcepts(trimmed, v.required_keywords);
+  const allConcepts = new Set<string>([...expHits, ...kwHits]);
+  if (expHits.size < 1 || allConcepts.size < 2) return fail;
+
+  // noise ratio: share of content words unrelated to this error
+  const vocab = Array.from(
+    new Set(
+      contentTokens(
+        [v.expected_correction, injectedError.explanation, injectedError.target_phrase, v.rationale_criteria ?? '', ...v.required_keywords].join(' '),
+        4
+      )
+    )
+  );
+  const userContent = contentTokens(trimmed, 4);
+  if (userContent.length > 0) {
+    const unknown = userContent.filter((t) => !vocab.some((vv) => tokenMatches(t, vv))).length;
+    if (unknown / userContent.length > 0.4) return fail;
+  }
+
+  return {
+    isValid: true,
+    feedback: 'Megfelelő szakmai korrekciós javaslat: Az azonosított ténybeli eltérés helyesbítésre került.',
   };
 }
 
@@ -295,9 +452,16 @@ export async function evaluateAudit(
       const categoryScore = typeMatched ? Math.round(err.points * 0.25) : 0;
 
       // Justification: 25% of item points
+      const groundingText = [
+        err.target_phrase,
+        err.explanation,
+        err.validation.expected_correction,
+        err.validation.rationale_criteria ?? '',
+      ].join(' ');
       const justResult = evaluateJustification(
         matchingAnnotation.justification || '',
-        err.validation.required_keywords
+        err.validation.required_keywords,
+        groundingText
       );
       const justificationScore = justResult.isValid ? Math.round(err.points * 0.25) : 0;
 

@@ -3,14 +3,13 @@ import {
   Building2,
   Trash2,
   AlertCircle,
-  HelpCircle,
-  CheckCircle,
   Calculator,
   ArrowRight,
   ShieldAlert,
 } from 'lucide-react';
 import type { Scenario, UserAnnotation, ErrorType } from '../types/audit';
 import { ERROR_TYPE_LABELS } from '../types/audit';
+import { normalizeText } from '../utils/auditScoring';
 
 interface AuditPanelProps {
   scenario: Scenario;
@@ -163,6 +162,13 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
                 const isSelected = selectedAnnotationId === ann.id;
                 const justLen = ann.justification.trim().length;
                 const isJustShort = justLen > 0 && justLen < 20;
+                // Structural requirements only (mirrors evaluateJustification). Required keywords are
+                // deliberately NOT checked here: the UI must never reveal the solution.
+                const justWordList = normalizeText(ann.justification).split(' ').filter((w) => w.length >= 2);
+                const justWords = justWordList.length;
+                const justDistinct = new Set(justWordList).size;
+                const justStructOk = justLen >= 20 && justWords >= 5 && justDistinct >= 4;
+                const isJustThin = justLen >= 20 && !justStructOk;
                 const hasCorrection = ann.proposedCorrection.trim().length > 0;
 
                 return (
@@ -217,10 +223,10 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
                     <div className="space-y-1.5 select-text">
                       <div className="flex items-center justify-between">
                         <label className="text-[10px] font-mono text-neutral-400 block">
-                          Auditori indoklás (25% súlyozás, min. 20 karakter & 4 szó):
+                          Auditori indoklás (25% súlyozás, min. 20 karakter, 5 szó, legalább két kulcsfogalom és a konkrét adat megnevezése):
                         </label>
-                        <span className={`text-[10px] font-mono ${justLen >= 20 ? 'text-emerald-400' : justLen > 0 ? 'text-amber-400' : 'text-neutral-500'}`}>
-                          {justLen}/20 betű
+                        <span className={`text-[10px] font-mono ${justStructOk ? 'text-emerald-400' : justLen > 0 ? 'text-amber-400' : 'text-neutral-500'}`}>
+                          {justLen}/20 betű · {justWords}/5 szó
                         </span>
                       </div>
                       <textarea
@@ -237,6 +243,16 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
                       {isJustShort && (
                         <p className="text-[10px] text-amber-400/90 font-mono">
                           Még {20 - justLen} karakter szükséges az érvényes indokláshoz.
+                        </p>
+                      )}
+                      {isJustThin && (
+                        <p className="text-[10px] text-amber-400/90 font-mono">
+                          Az indoklásnak legalább 5 szóból (min. 4 különböző) álló összefüggő állításnak kell lennie.
+                        </p>
+                      )}
+                      {justStructOk && (
+                        <p className="text-[10px] text-neutral-500 font-mono">
+                          A pontozás a szakmai tartalmat is vizsgálja: nevezd meg a hiba okát és a dokumentum konkrét adatát vagy állítását (számadat, fogalom); kulcsszavak puszta felsorolása nem ad pontot.
                         </p>
                       )}
                     </div>
@@ -260,6 +276,9 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
                         placeholder="pl. 20.97% valós EBITDA árrés"
                         className="w-full bg-neutral-950 border border-neutral-800 rounded px-2.5 py-1 text-xs text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-600 font-sans"
                       />
+                      <p className="text-[10px] text-neutral-500 font-mono">
+                        Számszaki hibánál add meg a korrigált számot (levezetéssel együtt is jó, pl. 12.4 - 9.8 = 2.6, azaz 20.97%). Egyéb hibánál fogalmazd meg a helyes tényt legalább 3 szóban.
+                      </p>
                     </div>
                   </div>
                 );
