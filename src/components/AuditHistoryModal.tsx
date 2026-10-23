@@ -51,7 +51,7 @@ export const AuditHistoryModal: React.FC = () => {
             </div>
             <div>
               <h2 id="history-modal-title" className="text-base font-bold text-neutral-100">
-                Audit Előzmények & SHA-256 Tanúsítványok
+                Audit Előzmények és Helyi SHA-256 Lenyomatok
               </h2>
               <p className="text-xs text-neutral-400">
                 A helyi böngészőben tárolt, SHA-256 lenyomattal ellátott, nem hitelesített helyi gyakorlóeredmények.
@@ -99,7 +99,7 @@ export const AuditHistoryModal: React.FC = () => {
             <div className="text-xs text-neutral-400 border-t sm:border-t-0 sm:border-l border-neutral-800 pt-2 sm:pt-0 sm:pl-4">
               <span className="text-neutral-500 block text-[10px]">Helyi gyakorlóeredmények:</span>
               <span className="font-mono text-emerald-400 font-bold text-sm">
-                {pastAuditHistory.length} db tanúsítvány
+                {pastAuditHistory.length} db helyi eredmény
               </span>
             </div>
           </div>
