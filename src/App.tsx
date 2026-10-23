@@ -54,7 +54,7 @@ function WorkbenchContent() {
   } = useAudit();
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-neutral-900 text-neutral-100 antialiased font-sans">
+    <div className="flex flex-col h-screen w-screen max-w-full overflow-x-hidden overflow-y-hidden bg-neutral-900 text-neutral-100 antialiased font-sans">
       {/* 3-Zone Top Navigation Bar */}
       <TopBar />
 

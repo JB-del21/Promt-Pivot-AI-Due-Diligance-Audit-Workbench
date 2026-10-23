@@ -109,69 +109,69 @@ ${evaluation.detailedMatches
   };
 
   return (
-    <div className="flex-1 bg-neutral-950 overflow-y-auto px-4 py-8 lg:px-12 select-text">
-      <div className="max-w-4xl mx-auto space-y-8 print-page">
+    <div className="flex-1 bg-neutral-950 overflow-y-auto overflow-x-hidden px-3 sm:px-6 py-6 sm:py-8 lg:px-12 select-text w-full max-w-full">
+      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 print-page w-full max-w-full">
         {/* Actions Bar (hidden on print) */}
-        <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-neutral-900 border border-neutral-800 no-print">
-          <div className="flex items-center gap-2">
-            <FileCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-semibold text-neutral-200">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-neutral-900 border border-neutral-800 no-print w-full max-w-full overflow-hidden">
+          <div className="flex items-center gap-2 min-w-0">
+            <FileCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="text-xs font-semibold text-neutral-200 shrink-0">
               Audit Kiértékelés Elkészült
             </span>
-            <span className="text-xs font-mono text-neutral-500 truncate max-w-[220px]" title={evaluation.canonicalHash}>
+            <span className="text-xs font-mono text-neutral-500 truncate max-w-full sm:max-w-[200px]" title={evaluation.canonicalHash}>
               · {evaluation.canonicalHash}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs w-full md:w-auto">
             <button
               onClick={handleCopyMarkdown}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors"
+              className="flex-1 sm:flex-none min-w-[120px] flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors min-h-[38px] sm:min-h-0"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Másolva!' : 'Markdown Másolása'}</span>
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> : <Copy className="w-3.5 h-3.5 shrink-0" />}
+              <span className="truncate">{copied ? 'Másolva!' : 'Markdown'}</span>
             </button>
 
             <button
               onClick={handleDownloadJson}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors"
+              className="flex-1 sm:flex-none min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors min-h-[38px] sm:min-h-0"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>JSON Export</span>
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">JSON Export</span>
             </button>
 
             {onOpenBenchmark && (
               <button
                 onClick={onOpenBenchmark}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition-all font-medium"
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition-all font-medium min-h-[38px] sm:min-h-0"
               >
-                <Cpu className="w-3.5 h-3.5 text-purple-400" />
-                <span>AI Benchmark Aréna</span>
+                <Cpu className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span className="truncate">AI Benchmark Aréna</span>
               </button>
             )}
 
             {onOpenCohort && (
               <button
                 onClick={onOpenCohort}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all font-medium"
+                className="flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all font-medium min-h-[38px] sm:min-h-0"
               >
-                <Users className="w-3.5 h-3.5 text-amber-400" />
-                <span>Kohorsz Hőtérkép</span>
+                <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="truncate">Kohorsz Hőtérkép</span>
               </button>
             )}
 
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-neutral-100 hover:bg-white text-neutral-950 font-semibold transition-colors"
+              className="flex-1 sm:flex-none min-w-[120px] flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-1.5 rounded bg-neutral-100 hover:bg-white text-neutral-950 font-semibold transition-colors min-h-[38px] sm:min-h-0"
             >
-              <Printer className="w-3.5 h-3.5 text-neutral-900" />
-              <span>Nyomtatás / PDF</span>
+              <Printer className="w-3.5 h-3.5 text-neutral-900 shrink-0" />
+              <span className="truncate">Nyomtatás / PDF</span>
             </button>
           </div>
         </div>
 
         {/* Printable Executive Document Sheet */}
-        <article className="p-8 sm:p-12 rounded-xl bg-neutral-900 border border-neutral-800 shadow-xl space-y-8 text-neutral-200">
+        <article className="p-4 sm:p-8 md:p-12 rounded-xl bg-neutral-900 border border-neutral-800 shadow-xl space-y-6 sm:space-y-8 text-neutral-200 w-full max-w-full overflow-hidden">
           {/* Document Header */}
           <div className="border-b border-neutral-800 pb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
@@ -204,7 +204,7 @@ ${evaluation.detailedMatches
                 <Lock className="w-3 h-3 text-emerald-400" />
                 <span>SHA-256 Hash:</span>
               </div>
-              <div className="text-emerald-400 font-bold text-[11px] truncate max-w-[280px]" title={evaluation.canonicalHash}>
+              <div className="text-emerald-400 font-bold text-[11px] truncate max-w-full sm:max-w-[280px]" title={evaluation.canonicalHash}>
                 {evaluation.canonicalHash}
               </div>
               <div className="text-neutral-400">Dátum: <span className="text-neutral-300">{evaluation.submittedAt}</span></div>
@@ -463,7 +463,7 @@ ${evaluation.detailedMatches
           {/* Verification Stamp Footer */}
           <div className="pt-6 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 font-mono gap-2">
             <span>METHODOLOGY STAMP: GDE-DUE-DILIGENCE-V1</span>
-            <span className="truncate max-w-[360px]" title={evaluation.canonicalHash}>VERIFIED CANONICAL HASH: {evaluation.canonicalHash}</span>
+            <span className="truncate max-w-full sm:max-w-[360px]" title={evaluation.canonicalHash}>VERIFIED CANONICAL HASH: {evaluation.canonicalHash}</span>
           </div>
         </article>
 
