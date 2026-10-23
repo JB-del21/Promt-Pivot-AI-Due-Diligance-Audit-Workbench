@@ -474,7 +474,7 @@ ${evaluation.detailedMatches
           {/* Verification Stamp Footer */}
           <div className="pt-6 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 font-mono gap-2">
             <span>METHODOLOGY STAMP: GDE-DUE-DILIGENCE-V1</span>
-            <span className="truncate max-w-full sm:max-w-[360px]" title={evaluation.canonicalHash}>VERIFIED CANONICAL HASH: {evaluation.canonicalHash}</span>
+            <span className="truncate max-w-full sm:max-w-[360px]" title={evaluation.canonicalHash}>LOCAL SHA-256 CHECKSUM (NOT SIGNED): {evaluation.canonicalHash}</span>
           </div>
         </article>
 
