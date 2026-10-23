@@ -1,3 +1,4 @@
+import { authenticatedFetch } from '../auth/client';
 import React, { useState, useEffect } from 'react';
 import {
   Users,
@@ -57,7 +58,7 @@ export const CohortDashboardView: React.FC<CohortDashboardViewProps> = ({
       const url = `/api/cohort/metrics?scenarioId=${encodeURIComponent(
         currentScenario.scenario_id
       )}&group=${encodeURIComponent(selectedGroup)}`;
-      const res = await fetch(url);
+      const res = await authenticatedFetch(url);
       if (!res.ok) throw new Error('Hiba a kohorsz adatok betöltésekor');
       const json: CohortAnalysisData = await res.json();
       setData(json);

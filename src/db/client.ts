@@ -18,7 +18,7 @@ if (connectionString) {
     pool = new Pool({
       connectionString,
       ssl: process.env.NODE_ENV === 'production' || connectionString.includes('supabase') || connectionString.includes('neon')
-        ? { rejectUnauthorized: process.env.DB_REJECT_UNAUTHORIZED === 'true' }
+        ? { rejectUnauthorized: true }
         : false,
       max: 10,
       idleTimeoutMillis: 30000,
@@ -37,7 +37,7 @@ if (connectionString) {
  * Throws on database failure so caller can detect and handle errors.
  */
 export async function executeQuery<T = any>(text: string, params?: any[]): Promise<T[]> {
-  if (!pool) return [];
+  if (!pool) throw new Error('Database unavailable');
   let client: pg.PoolClient | null = null;
   try {
     client = await pool.connect();
@@ -61,7 +61,7 @@ export async function saveAuditReportToDb(payload: {
   auditStatus: string;
   rawAuditJson: any;
   sha256Hash: string;
-  tenantId?: string;
+  tenantId: string;
   auditMode?: string;
   faultResults?: Array<{ faultId: string; status: string; comment?: string }>;
 }): Promise<{ success: boolean; reportId?: string; error?: string }> {
@@ -77,10 +77,6 @@ export async function saveAuditReportToDb(payload: {
         scenario_id, user_name, user_role, device_type, total_score, audit_status, raw_audit_json, sha256_hash, tenant_id, audit_mode
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      ON CONFLICT (sha256_hash) DO UPDATE SET
-        total_score = EXCLUDED.total_score,
-        audit_status = EXCLUDED.audit_status,
-        tenant_id = EXCLUDED.tenant_id
       RETURNING id;
     `;
 
@@ -93,7 +89,7 @@ export async function saveAuditReportToDb(payload: {
       payload.auditStatus,
       JSON.stringify(payload.rawAuditJson),
       payload.sha256Hash,
-      payload.tenantId || 'default-tenant',
+      payload.tenantId,
       payload.auditMode || 'standard',
     ]);
 
@@ -131,9 +127,8 @@ export async function saveAuditReportToDb(payload: {
  * Fetch persisted audit reports for a specific scenario and tenant
  */
 export async function fetchAuditReportsFromDb(scenarioId: string, tenantId: string = 'default-tenant'): Promise<any[]> {
-  if (!pool) return [];
-  try {
-    return await executeQuery(
+  if (!pool) throw new Error('Database unavailable');
+  return await executeQuery(
       `SELECT 
         id,
         scenario_id as "scenarioId",
@@ -147,13 +142,21 @@ export async function fetchAuditReportsFromDb(scenarioId: string, tenantId: stri
         audit_mode as "auditMode",
         submitted_at as "submittedAt"
       FROM audit_reports
-      WHERE scenario_id = $1 AND (tenant_id = $2 OR tenant_id = 'default-tenant')
+      WHERE scenario_id = $1 AND tenant_id = $2
       ORDER BY submitted_at DESC
       LIMIT 50`,
       [scenarioId, tenantId]
     );
-  } catch (err) {
-    console.warn('[PostgreSQL Fetch Reports Error]:', err);
-    return [];
-  }
+}
+
+/** Shared per-tenant budget across serverless instances; fails closed when DB is unavailable. */
+export async function consumeBenchmarkQuota(tenantId: string, maxPerMinute = 10): Promise<boolean> {
+  const rows = await executeQuery<{ request_count: number }>(
+    `INSERT INTO benchmark_rate_limits (tenant_id, window_start, request_count)
+     VALUES ($1, date_trunc('minute', now()), 1)
+     ON CONFLICT (tenant_id, window_start) DO UPDATE
+       SET request_count = benchmark_rate_limits.request_count + 1
+       WHERE benchmark_rate_limits.request_count < $2
+     RETURNING request_count`, [tenantId, maxPerMinute]);
+  return rows.length === 1;
 }

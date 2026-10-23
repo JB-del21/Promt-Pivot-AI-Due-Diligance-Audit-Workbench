@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { SCENARIOS } from '../data/scenarios';
 import type { Scenario, UserAnnotation, ErrorType, EvaluationResult } from '../types/audit';
 import { evaluateAudit } from '../utils/auditScoring';
+import { authClient, authenticatedFetch } from '../auth/client';
 
 export interface UserProfile {
   name: string;
@@ -29,6 +30,7 @@ interface AuditContextType {
   annotations: UserAnnotation[];
   selectedAnnotationId: string | null;
   evaluation: EvaluationResult | null;
+  serverSync: { state: 'LOCAL' | 'SAVING' | 'PERSISTED' | 'FAILED'; message: string };
   elapsedSeconds: number;
   isStrictMode: boolean;
   activeView: 'WORKBENCH' | 'COHORT';
@@ -132,6 +134,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
+  const [serverSync, setServerSync] = useState<{ state: 'LOCAL' | 'SAVING' | 'PERSISTED' | 'FAILED'; message: string }>({ state: 'LOCAL', message: 'Helyi gyakorlóeredmény, nem hitelesített.' });
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(() => {
     try {
       const savedSession = localStorage.getItem(STORAGE_KEY_SESSION);
@@ -286,6 +289,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const resetAudit = () => {
+    setServerSync({ state: 'LOCAL', message: 'Helyi gyakorlóeredmény, nem hitelesített.' });
     setAnnotations([]);
     setSelectedAnnotationId(null);
     setEvaluation(null);
@@ -339,29 +343,45 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return updated;
     });
 
-    // Real-time background sync to PostgreSQL / Supabase Database
+    // Persist only when authenticated. Server recalculates the score and digest.
+    const { data: { session } } = authClient
+      ? await authClient.auth.getSession()
+      : { data: { session: null } };
+    if (!session) {
+      setServerSync({ state: 'LOCAL', message: 'Helyi gyakorlóeredmény. Szerveres mentéshez jelentkezz be.' });
+      return;
+    }
+    setServerSync({ state: 'SAVING', message: 'Szerveroldali újrapontozás és mentés…' });
     try {
-      fetch('/api/reports', {
+      const response = await authenticatedFetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scenarioId: currentScenario.scenario_id,
+          annotations,
+          elapsedSeconds,
+          isStrictMode,
           userName: userProfile.name,
           userRole: userProfile.role,
           deviceType: 'web',
-          totalScore: result.totalScore,
-          auditStatus: grade,
-          rawAuditJson: JSON.parse(result.canonicalPayload),
-          sha256Hash: result.canonicalHash,
-          faultResults: result.detailedMatches.map((m) => ({
-            faultId: m.injectedError?.id || 'unknown',
-            status: m.status === 'TRUE_POSITIVE' ? 'CAUGHT' : m.status === 'PARTIAL_MATCH' ? 'PARTIAL' : 'BLIND_SPOT',
-            comment: m.feedbackNotes,
-          })),
         }),
-      }).catch((e) => console.warn('Database background sync notice:', e));
-    } catch (e) {
-      console.warn('Background fetch error:', e);
+      });
+      const data = await response.json() as {
+        success?: boolean; persistedToDb?: boolean;
+        serverVerifiedScore?: number; reportId?: string; error?: string;
+      };
+      if (!response.ok || !data.success || !data.persistedToDb || !data.reportId) {
+        throw new Error(data.error || 'Szerveres mentés nem igazolt.');
+      }
+      setServerSync({
+        state: 'PERSISTED',
+        message: `Adatbázisba mentve. Szerveroldali pontszám: ${data.serverVerifiedScore ?? 'ismeretlen'}; azonosító: ${data.reportId}.`,
+      });
+    } catch (error) {
+      setServerSync({
+        state: 'FAILED',
+        message: `A helyi eredmény elkészült, de a szerveres mentés sikertelen: ${error instanceof Error ? error.message : 'Ismeretlen hiba'}`,
+      });
     }
   };
 
@@ -370,6 +390,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setAnnotations([]);
     setSelectedAnnotationId(null);
     setEvaluation(null);
+    setServerSync({ state: 'LOCAL', message: 'Helyi gyakorlóeredmény, nem hitelesített.' });
     setElapsedSeconds(0);
     setMobileTab('doc');
   };
@@ -407,6 +428,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         annotations,
         selectedAnnotationId,
         evaluation,
+        serverSync,
         elapsedSeconds,
         isStrictMode,
         activeView,

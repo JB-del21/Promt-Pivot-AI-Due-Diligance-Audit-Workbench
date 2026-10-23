@@ -99,3 +99,14 @@ test('INDEPENDENT MATHEMATICAL VERIFICATION: Scenario 4 (Project GenAI IP)', () 
     `Independently calculated IP margin ${actualIpMarginPercent}% must fall within tolerance range [${tol.min}, ${tol.max}]`
   );
 });
+
+test('GROUND TRUTH: GenAI document multiple must imply the stated approximate EV', () => {
+  const scenario = SCENARIOS.find(s => s.scenario_id === 'mna-ai-startup-ip-royalty-2026')!;
+  const multiple = scenario.document_markdown.match(/(\d+(?:\.\d+)?)x IP-szorzóját/);
+  const targetEv = scenario.document_markdown.match(/\$(\d+(?:\.\d+)?)M körüli vállalati értékelést/);
+  const arr = scenario.context.arr.match(/\$(\d+(?:\.\d+)?)M/);
+  assert.ok(multiple && targetEv && arr, 'All 3 scenario valuation facts must be present');
+  const estimatedEv = Number(multiple[1]) * Number(arr[1]);
+  assert.ok(Math.abs(estimatedEv - Number(targetEv[1])) <= 0.5,
+    'Embedded valuation multiple must be arithmetically consistent with stated approximate EV');
+});

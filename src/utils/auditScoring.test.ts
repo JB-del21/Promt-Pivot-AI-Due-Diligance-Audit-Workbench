@@ -10,6 +10,7 @@ import {
   evaluateAudit,
   matchKeywordConcepts,
   extractNumbers,
+  checkAdditiveEquations,
   FinancialCalculators,
 } from './auditScoring.ts';
 import type { InjectedError, UserAnnotation } from '../types/audit.ts';
@@ -76,7 +77,7 @@ const LEGIT_BY_SCENARIO: Array<Array<{ just: string; corr: string }>> = [
   [
     // err-01 (NUMERIC: IP Royalty Margin)
     {
-      just: 'A $8.5M árbevételből levonva az $1.3M nyílt forráskódú licencdíjat és a $3.1M R&D ráfordítást, a tiszta IP árrés $3.9M, ami 45.88% ($3.9M / $8.5M), nem pedig 81.2%.',
+      just: 'A $8.5M árbevételből levonva az $1.5M nyílt forráskódú licencdíjat és a $3.1M R&D ráfordítást, a tiszta IP árrés $3.9M, ami 45.88% ($3.9M / $8.5M), nem pedig 81.2%.',
       corr: '45.88% valós IP árrés ($3.9M / $8.5M)',
     },
     // err-02 (LOGICAL: Proprietary Copyleft)
@@ -472,4 +473,25 @@ test('evaluateAudit records auditMode as STRICT or GUIDED', async () => {
 
   const guidedRes = await evaluateAudit(sc.injected_errors, anns, 120, sc.scenario_id, 'GUIDED');
   assert.equal(guidedRes.auditMode, 'GUIDED');
+});
+
+test('REGRESSION: simple arithmetic falsifier rejects GenAI stale 1.3M equation', () => {
+  assert.deepEqual(checkAdditiveEquations('$8.5M - $1.3M - $3.1M = $3.9M'),
+    { valid: false, checked: 1 });
+  assert.deepEqual(checkAdditiveEquations('$8.5M - $1.5M - $3.1M = $3.9M'),
+    { valid: true, checked: 1 });
+  assert.deepEqual(checkAdditiveEquations('12,4 - 9,8 = 2,6'),
+    { valid: true, checked: 1 });
+  assert.deepEqual(checkAdditiveEquations('12.4 - 9.8 = 9.9'),
+    { valid: false, checked: 1 });
+});
+
+test('REGRESSION: incorrect explicit calculation cannot earn valid justification', () => {
+  const err = SCENARIOS[3].injected_errors[0];
+  const ground = [err.target_phrase, err.explanation, err.validation.expected_correction].join(' ');
+  const wrong = 'A jogdíj árrés hibás, mert $8.5M - $1.3M - $3.1M = $3.9M, azaz 45.88%, nem 81.2%.';
+  const correct = 'A jogdíj árrés hibás, mert $8.5M - $1.5M - $3.1M = $3.9M, azaz 45.88%, nem 81.2%.';
+  assert.equal(evaluateJustification(wrong, err.validation.required_keywords, ground).isValid, false);
+  assert.equal(evaluateJustification(correct, err.validation.required_keywords, ground).isValid, true);
+  assert.equal(evaluateCorrection('45.88% mert 8.5 - 1.3 - 3.1 = 3.9', err).isValid, false);
 });

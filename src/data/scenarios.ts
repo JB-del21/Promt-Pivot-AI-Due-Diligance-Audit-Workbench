@@ -279,7 +279,7 @@ A célvállalat tulajdonában lévő saját fejlesztésű LLM alapmodell és tra
 
 A szellemi tulajdon jogi védettségét és a nyílt forráskódú kitettséget vizsgálva megállapítható, hogy a core AI modell 100%-ban zárt forráskódú (Proprietary Copyleft) védelmet élvez, amely kizárja a GPLv3 licencáttételi kockázatot, így a társaság által használt nyílt kódok semmilyen módon nem kötelezik a vállalatot a proprietary kódkészlet nyilvánossá tételére.
 
-A nemzetközi szellemi tulajdon értékeléshez az elemzés a legfrissebb WIPO-EPO Joint European DeepTech Patent & AI Royalty Benchmark 2026/Q2 hivatalos szabványában rögzített 18.5x IP-szorzóját alkalmazta, ami alátámasztja a $120M körüli vállalati értékelést (EV).`,
+A nemzetközi szellemi tulajdon értékeléshez az elemzés a legfrissebb WIPO-EPO Joint European DeepTech Patent & AI Royalty Benchmark 2026/Q2 hivatalos szabványában rögzített 14.1x IP-szorzóját alkalmazta, ami alátámasztja a $120M körüli vállalati értékelést (EV).`,
     injected_errors: [
       {
         id: 'err-01',

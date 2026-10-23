@@ -141,6 +141,35 @@ export function extractNumbers(text: string): number[] {
   return matches.map((m) => parseFloat(m)).filter((n) => Number.isFinite(n));
 }
 
+/**
+ * Reject objectively wrong explicit additive/subtractive equations.
+ * This is a narrow arithmetic falsifier, NOT proof that the wider reasoning
+ * or unstated financial assumptions are sound.
+ */
+export function checkAdditiveEquations(text: string): { valid: boolean; checked: number } {
+  const number = String.raw`(?:[$€]\s*)?(\d+(?:[.,]\d+)?)\s*[Mm]?`;
+  const equations = new RegExp(
+    `${number}\\s*([-+])\\s*${number}(?:\\s*([-+])\\s*${number})?\\s*=\\s*${number}`,
+    'g'
+  );
+  const parse = (value: string) => Number(value.replace(',', '.'));
+  let checked = 0;
+  for (const match of text.matchAll(equations)) {
+    checked++;
+    const first = parse(match[1]);
+    const second = parse(match[3]);
+    const third = match[5] ? parse(match[5]) : 0;
+    const expected = parse(match[6]);
+    const actual = first + (match[2] === '+' ? second : -second) +
+      (match[4] === '+' ? third : match[4] === '-' ? -third : 0);
+    if (!Number.isFinite(actual) || !Number.isFinite(expected) ||
+        Math.abs(actual - expected) > Math.max(0.011, Math.abs(actual) * 0.001)) {
+      return { valid: false, checked };
+    }
+  }
+  return { valid: true, checked };
+}
+
 const NUMERIC_KEYWORD = /^-?\d+(?:[.,]\d+)?\s*%?$/;
 
 /**
@@ -242,6 +271,10 @@ export function evaluateJustification(
     };
   }
 
+  if (!checkAdditiveEquations(trimmed).valid) return {
+    isValid: false, feedback: 'Számszaki ellentmondás: A megadott egyenlet matematikailag hibás.'
+  };
+
   const normJust = normalizeText(trimmed);
   if (new Set(normJust.replace(/\s+/g, '')).size < 5) {
     return {
@@ -324,6 +357,10 @@ export function evaluateCorrection(
       feedback: 'Érvénytelen korrekció: A megadott szöveg értelmetlen karakterhalmaz.',
     };
   }
+
+  if (!checkAdditiveEquations(trimmed).valid) return {
+    isValid: false, feedback: 'A helyesbítésben szereplő egyenlet matematikailag hibás.'
+  };
 
   const v = injectedError.validation;
   const tolerance = v.numeric_tolerance;

@@ -3,12 +3,24 @@
 > **Enterprise B2B SaaS & EdTech Audit Platform** for training, evaluating, and benchmarking human analysts, junior auditors, and LLM AI agents on synthetic M&A due diligence reports, financial statements, and IP royalty disclosures.
 
 ![Version](https://img.shields.io/badge/version-2.4.0--enterprise-emerald)
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
-![Tests](https://img.shields.io/badge/tests-20%2F20%20passing-success)
+
+[![Release Gate CI](https://github.com/JB-del21/Promt-Pivot-AI-Due-Diligance-Audit-Workbench/actions/workflows/release-gate.yml/badge.svg?branch=fix/v7-1-security-evidence-closure)](https://github.com/JB-del21/Promt-Pivot-AI-Due-Diligance-Audit-Workbench/actions/workflows/release-gate.yml)
+
 ![Platform](https://img.shields.io/badge/platform-Vercel%20Serverless%20%7C%20Supabase%20PostgreSQL-black)
 
 ---
+
+## Release state: v7.1 draft / NO-GO production
+
+The secured changes are on the `fix/v7-1-security-evidence-closure` Pull Request branch, **not** merged into production `main`. GitHub CI validates code and an isolated PostgreSQL database, but this does **not** attest to production tenant isolation, identity provider configuration or a live model deployment.
+
+- Public synthetic practice is available without identity.
+- `/api/reports`, `/api/reports/verify`, `/api/cohort/metrics`, and `/api/benchmark/run` require a short-lived RS256 JWT signed by a trusted issuer; missing auth configuration fails closed.
+- The signed `tenant_id` claim must be assigned by a trusted identity provider; `x-tenant-id` is not accepted as authority.
+- Server report integrity is a recomputed SHA-256 *content check*, not an external certificate, signature or legal attestation.
+- Preset AI model ratings are **synthetic demonstrations**, not live empirical model comparisons.
+- A real sign-in interface and trusted identity provider have not yet been configured. Therefore protected features will not be usable in a preview until identity setup is complete.
+- Apply the `benchmark_rate_limits` SQL migration on a disposable test database before enabling authenticated endpoints. See [release gate plan](docs/RELEASE_GATE_V7_1.md).
 
 ## 🌐 Live Application Links
 
@@ -21,16 +33,16 @@
 
 In the era of Generative AI, language models frequently output authoritative-sounding financial analyses, valuation multiples, and legal disclaimers containing **hallucinated sources**, **mathematical inconsistencies**, and **logical contradictions**.
 
-**PROMPT & PIVOT** provides an adversarial, zero-trust audit environment where human analysts and AI models are tested against calibrated seed faults.
+**PROMPT & PIVOT** provides an adversarial, controlled synthetic audit training environment where human analysts and AI models are tested against calibrated seed faults.
 
 ### 🌟 Key Capabilities
 * **Interactive Redlining Document Viewer:** Real-time text-selection annotation bubble supporting touch and mouse interactions.
 * **4-Dimensional Deterministic Grading Engine:** Scores findings across 4 distinct pillars (Discovery 35%, Category Classification 25%, Professional Rationale 25%, Numerical Correction 15%) with severe False Positive penalties (-20 pts).
 * **Strict Mode / Blind Worksheet (Didactic Difficulty):** Toggle mode that strips visual highlights, forcing analysts to independently discover hidden anomalies.
-* **Dual Benchmark Arena (Human vs. AI):** Real-time side-by-side performance comparison against **Gemini 3.8 Flash**, **Claude 3.5 Sonnet**, **GPT-4o**, and **Llama 3 70B**.
+* **Dual Benchmark Arena (Human vs. AI):** Illustrative synthetic presets for **Gemini 3.8 Flash**, **Claude 3.5 Sonnet**, **GPT-4o**, and **Llama 3 70B**.
 * **Cohort Analytics & Fault Heatmap Matrix:** Executive dashboard aggregating participant error rates, systemic blind spots, and team performance metrics.
-* **Cryptographic Data Integrity (RFC 8785 + SHA-256):** Key-ordered canonical JSON generation and SHA-256 hashing for verifiable, tamper-evident audit certificates.
-* **Omnichannel Mobile Integration:** Live embedded streaming Android emulator, QR-code physical device testing, and bidirectional web-mobile sync.
+* **Cryptographic Data Integrity (RFC 8785 + SHA-256):** Key-ordered canonical JSON generation and SHA-256 hashing for verifiable, content checksums (not independently signed certificates).
+* **Omnichannel Mobile Integration:** Mobile-oriented interface previews and QR-code testing (no production bidirectional synchronization has been verified).
 * **Stateful Serverless Storage:** PostgreSQL (Supabase / Neon) database persistence layer for audit submissions, cohort heatmaps, and verification checks.
 
 ---
@@ -44,7 +56,7 @@ The platform features 4 high-stakes, domain-authentic due diligence scenarios:
 | `mna-saas-cloudpulse-2026` | **Project CloudPulse**<br>*(Pénzügy / SaaS M&A)* | CloudPulse Analytics Kft. | `Haladó / M&A` | 1. **Numeric:** $12.4M ARR & $9.8M Opex yields 20.97% Cash EBITDA (claimed 35.2%).<br>2. **Logic:** 42% developer churn vs. claimed "negligible key person risk".<br>3. **Fabricated Source:** Non-existent "Gartner-McKinsey Joint Index". |
 | `ecommerce-nordic-retail-2026` | **Nordic Retail Group**<br>*(E-Commerce Unit Economics)* | Nordic Brands D2C Holding | `Középhaladó` | 1. **Numeric:** €3.6M marketing / 90k customers = €40.00 Blended CAC (claimed €12.50).<br>2. **Logic:** Inventory turnover down to 24 days while logistics costs jump 65%.<br>3. **Fabricated Source:** Hallucinated "Shopify-Statista European D2C Standard". |
 | `fintech-novapay-risk-2026` | **NovaPay Technologies**<br>*(FinTech & Capital Adequacy)* | NovaPay Lending Platform | `Haladó / M&A` | 1. **Numeric:** €5.4M Tier 1 / €45M RWA = 12.0% Tier 1 CAR (claimed 24.5%).<br>2. **Logic:** NPL jump from 4.2% to 7.8% presented as "unprecedented quality improvement".<br>3. **Fabricated Source:** Fake "EBA/GL/2026/994 Liquidity Exemption Directive". |
-| `mna-ai-startup-ip-royalty-2026` | **Project GenAI IP**<br>*(DeepTech Startup & IP Royalty)* | Cognitive Core AI Labs Kft. | `Haladó / M&A` | 1. **Numeric:** $8.5M ARR minus $1.3M OSS fees & $3.1M R&D = 45.88% IP Margin (claimed 81.2%).<br>2. **Logic:** Oxymoronic "Proprietary Copyleft" protection concealing GPLv3 viral copyleft risk.<br>3. **Fabricated Source:** Hallucinated "WIPO-EPO Joint AI Royalty Benchmark". |
+| `mna-ai-startup-ip-royalty-2026` | **Project GenAI IP**<br>*(DeepTech Startup & IP Royalty)* | Cognitive Core AI Labs Kft. | `Haladó / M&A` | 1. **Numeric:** $8.5M ARR minus $1.5M OSS fees & $3.1M R&D = 45.88% IP Margin (claimed 81.2%).<br>2. **Logic:** Oxymoronic "Proprietary Copyleft" protection concealing GPLv3 viral copyleft risk.<br>3. **Fabricated Source:** Hallucinated "WIPO-EPO Joint AI Royalty Benchmark". |
 
 ---
 
@@ -87,47 +99,9 @@ The platform features 4 high-stakes, domain-authentic due diligence scenarios:
 
 ---
 
-## 🗄️ Database Schema (`schema.sql`)
+## 🗄️ Database Schema
 
-The application automatically persists audit reports and cohort results to PostgreSQL using the following structure:
-
-```sql
--- 1. Audit Scenarios
-CREATE TABLE IF NOT EXISTS audit_scenarios (
-  id VARCHAR(64) PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  company_name VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 2. Audit Reports & Verified Hashes
-CREATE TABLE IF NOT EXISTS audit_reports (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  scenario_id VARCHAR(64) NOT NULL,
-  user_name VARCHAR(255) NOT NULL DEFAULT 'Anonymous Auditor',
-  user_role VARCHAR(100) NOT NULL DEFAULT 'Junior Analyst',
-  device_type VARCHAR(50) NOT NULL DEFAULT 'web',
-  total_score INT NOT NULL,
-  audit_status VARCHAR(50) NOT NULL,
-  raw_audit_json JSONB NOT NULL,
-  sha256_hash VARCHAR(64) NOT NULL UNIQUE,
-  submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 3. Fault Detection Results (Heatmap Data)
-CREATE TABLE IF NOT EXISTS fault_audit_results (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  report_id UUID REFERENCES audit_reports(id) ON DELETE CASCADE,
-  fault_id VARCHAR(64) NOT NULL,
-  status VARCHAR(20) NOT NULL, -- 'CAUGHT' | 'PARTIAL' | 'BLIND_SPOT'
-  user_comment TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Indexes for instant verification and query acceleration
-CREATE INDEX IF NOT EXISTS idx_reports_scenario ON audit_reports(scenario_id);
-CREATE INDEX IF NOT EXISTS idx_reports_hash ON audit_reports(sha256_hash);
-```
+The canonical database schema is [schema.sql](schema.sql). Do not copy obsolete SQL snippets from prior README versions. Database migrations are operator-controlled, not automatically run by a Vercel deployment. Server-side tenant filters and a verified JWT issuer are mandatory for persisted customer records.
 
 ---
 
@@ -141,8 +115,8 @@ CREATE INDEX IF NOT EXISTS idx_reports_hash ON audit_reports(sha256_hash);
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-org/prompt-pivot-audit.git
-   cd prompt-pivot-audit
+   git clone https://github.com/JB-del21/Promt-Pivot-AI-Due-Diligance-Audit-Workbench.git
+   cd Promt-Pivot-AI-Due-Diligance-Audit-Workbench
    ```
 
 2. **Install dependencies:**
@@ -167,7 +141,8 @@ CREATE INDEX IF NOT EXISTS idx_reports_hash ON audit_reports(sha256_hash);
 
 5. **Run Test Suite:**
    ```bash
-   node --test src/utils/auditScoring.test.ts
+   npm run test:unit  # no database required
+   # npm test requires a disposable PostgreSQL prompt_pivot_test database
    ```
 
 6. **Build for Production:**
@@ -193,14 +168,14 @@ CREATE INDEX IF NOT EXISTS idx_reports_hash ON audit_reports(sha256_hash);
 ## 🧪 Quality Assurance & Verification
 
 * **TypeScript Compilation:** `npm run lint` (`tsc --noEmit`) returns **0 errors**.
-* **Unit Testing:** 20/20 test cases pass natively via `node --test`.
+* **Tests:** `npm run test:unit` checks the local engine and unauthenticated API rejection; `npm run test:db` requires a disposable PostgreSQL 16 `prompt_pivot_test` instance. See GitHub Actions for exact passing counts.
 * **RFC 8785 Compliance:** Tested against key-sorting, non-finite number rejections, and byte-exact SHA-256 digests.
-* **Mobile Responsiveness:** 100% compliant with touch target standards ($\ge 44\text{px}$) and zero horizontal overflow.
+* **Mobile Responsiveness:** Responsive UI is included; device/browser coverage is not independently certified.
 
 ---
 
 ## 📄 License & Attribution
 
-Distributed under the Apache 2.0 License.
+**License pending confirmation:** some source files have Apache-2.0 SPDX headers, but the repository currently has no root LICENSE file. Do not assume unrestricted reuse.
 
-Methodology grounded in academic research and professional M&A due diligence standards (Dr. Dietz Ferenc & Dr. Aczél Petra, *Világgazdaság*, 2024).
+Synthetic teaching scenarios. Any podcast attribution or named external source must be independently verified before being presented as a factual quotation.
