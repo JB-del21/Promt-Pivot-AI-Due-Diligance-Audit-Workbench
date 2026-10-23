@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Calculator, BookOpen, Clock, RotateCcw, CheckCircle2, FileText } from 'lucide-react';
+import { ShieldCheck, Calculator, BookOpen, Clock, RotateCcw, CheckCircle2, FileText, Cpu } from 'lucide-react';
 import type { Scenario } from '../types/audit';
 
 interface TopBarProps {
@@ -9,6 +9,7 @@ interface TopBarProps {
   onOpenCalculator: () => void;
   onOpenDocumentationModal: () => void;
   onOpenPodcastModal: () => void;
+  onOpenBenchmarkModal: () => void;
   onOpenScenarioSelector: () => void;
   onResetAudit: () => void;
   onSubmitAudit: () => void;
@@ -23,6 +24,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenCalculator,
   onOpenDocumentationModal,
   onOpenPodcastModal,
+  onOpenBenchmarkModal,
   onOpenScenarioSelector,
   onResetAudit,
   onSubmitAudit,
@@ -92,6 +94,15 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <BookOpen className="w-3.5 h-3.5 text-neutral-400" />
             <span className="hidden sm:inline">Podcast Háttér</span>
+          </button>
+
+          <button
+            onClick={onOpenBenchmarkModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition-all font-medium"
+            title="AI Benchmark Aréna: Humán Auditor vs. Gemini / Claude / GPT-4o"
+          >
+            <Cpu className="w-3.5 h-3.5 text-purple-400" />
+            <span className="hidden md:inline">AI Aréna</span>
           </button>
 
           {/* Timer & Audit Counter */}

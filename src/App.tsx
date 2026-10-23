@@ -14,6 +14,7 @@ import { FinancialCalculatorModal } from './components/FinancialCalculatorModal'
 import { PodcastContextModal } from './components/PodcastContextModal';
 import { ScenarioSelectorModal } from './components/ScenarioSelectorModal';
 import { SystemDocumentationModal } from './components/SystemDocumentationModal';
+import { AIBenchmarkModal } from './components/AIBenchmarkModal';
 import { AuditReportView } from './components/AuditReportView';
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false);
   const [isPodcastModalOpen, setIsPodcastModalOpen] = useState(false);
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
+  const [isBenchmarkModalOpen, setIsBenchmarkModalOpen] = useState(false);
 
   // Mobile layout tab toggle: 'doc' | 'panel'
   const [mobileTab, setMobileTab] = useState<'doc' | 'panel'>('doc');
@@ -62,6 +64,7 @@ export default function App() {
         setIsDocumentationModalOpen(false);
         setIsPodcastModalOpen(false);
         setIsScenarioModalOpen(false);
+        setIsBenchmarkModalOpen(false);
         setSelectedAnnotationId(null);
       }
     };
@@ -159,6 +162,7 @@ export default function App() {
         onOpenCalculator={() => setIsCalculatorOpen(true)}
         onOpenDocumentationModal={() => setIsDocumentationModalOpen(true)}
         onOpenPodcastModal={() => setIsPodcastModalOpen(true)}
+        onOpenBenchmarkModal={() => setIsBenchmarkModalOpen(true)}
         onOpenScenarioSelector={() => setIsScenarioModalOpen(true)}
         onResetAudit={handleResetAudit}
         onSubmitAudit={handleSubmitAudit}
@@ -236,6 +240,7 @@ export default function App() {
           evaluation={evaluation}
           onReset={handleResetAudit}
           onSelectNextScenario={handleSelectNextScenario}
+          onOpenBenchmark={() => setIsBenchmarkModalOpen(true)}
         />
       )}
 
@@ -261,6 +266,13 @@ export default function App() {
         onClose={() => setIsScenarioModalOpen(false)}
         currentScenarioId={currentScenario.scenario_id}
         onSelectScenario={handleSelectScenario}
+      />
+
+      <AIBenchmarkModal
+        isOpen={isBenchmarkModalOpen}
+        onClose={() => setIsBenchmarkModalOpen(false)}
+        scenario={currentScenario}
+        userEvaluation={evaluation}
       />
     </div>
   );

@@ -15,6 +15,7 @@ import {
   Lock,
   ChevronDown,
   ChevronUp,
+  Cpu,
 } from 'lucide-react';
 import type { Scenario, EvaluationResult } from '../types/audit';
 
@@ -23,6 +24,7 @@ interface AuditReportViewProps {
   evaluation: EvaluationResult;
   onReset: () => void;
   onSelectNextScenario?: () => void;
+  onOpenBenchmark?: () => void;
 }
 
 export const AuditReportView: React.FC<AuditReportViewProps> = ({
@@ -30,6 +32,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
   evaluation,
   onReset,
   onSelectNextScenario,
+  onOpenBenchmark,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
@@ -133,6 +136,16 @@ ${evaluation.detailedMatches
               <Download className="w-3.5 h-3.5" />
               <span>JSON Export</span>
             </button>
+
+            {onOpenBenchmark && (
+              <button
+                onClick={onOpenBenchmark}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition-all font-medium"
+              >
+                <Cpu className="w-3.5 h-3.5 text-purple-400" />
+                <span>AI Benchmark Aréna</span>
+              </button>
+            )}
 
             <button
               onClick={handlePrint}
