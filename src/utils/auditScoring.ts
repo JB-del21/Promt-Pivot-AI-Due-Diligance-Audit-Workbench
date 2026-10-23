@@ -418,7 +418,8 @@ export async function evaluateAudit(
   injectedErrors: InjectedError[],
   userAnnotations: UserAnnotation[],
   elapsedSeconds: number = 0,
-  scenarioId: string = 'generic'
+  scenarioId: string = 'generic',
+  auditMode: 'STRICT' | 'GUIDED' = 'STRICT'
 ): Promise<EvaluationResult> {
   const detailedMatches: MatchDetail[] = [];
   const matchedInjectedIds = new Set<string>();
@@ -645,6 +646,7 @@ export async function evaluateAudit(
     submittedAt,
     elapsedSeconds,
     scenarioId,
+    auditMode,
   };
 }
 

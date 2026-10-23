@@ -433,3 +433,14 @@ test('FinancialCalculators match standard definitions', () => {
   assert.equal(FinancialCalculators.blendedCac(3600000, 40000), 90.0);
   assert.equal(FinancialCalculators.ruleOf40(35, 12), 47.0);
 });
+
+test('evaluateAudit records auditMode as STRICT or GUIDED', async () => {
+  const sc = SCENARIOS[0];
+  const anns = sc.injected_errors.map((e, idx) => makeAnnotation(e, LEGIT_BY_SCENARIO[0][idx].just, LEGIT_BY_SCENARIO[0][idx].corr, sc.scenario_id));
+
+  const strictRes = await evaluateAudit(sc.injected_errors, anns, 120, sc.scenario_id, 'STRICT');
+  assert.equal(strictRes.auditMode, 'STRICT');
+
+  const guidedRes = await evaluateAudit(sc.injected_errors, anns, 120, sc.scenario_id, 'GUIDED');
+  assert.equal(guidedRes.auditMode, 'GUIDED');
+});

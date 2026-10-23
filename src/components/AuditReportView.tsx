@@ -183,9 +183,20 @@ ${evaluation.detailedMatches
               <h1 className="text-xl sm:text-2xl font-bold text-neutral-100 tracking-tight">
                 AI Szintetikus Tartalom Audit Jelentés
               </h1>
-              <p className="text-xs text-neutral-400 mt-1">
-                Eset: <strong className="text-neutral-200">{scenario.meta.title}</strong> · Célvállalat: <strong className="text-neutral-200">{scenario.context.target_name}</strong>
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <p className="text-xs text-neutral-400">
+                  Eset: <strong className="text-neutral-200">{scenario.meta.title}</strong> · Célvállalat: <strong className="text-neutral-200">{scenario.context.target_name}</strong>
+                </p>
+                {evaluation.auditMode === 'STRICT' ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase tracking-wider">
+                    Vak Munkalap (Szigorú Mód)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-neutral-800 text-neutral-300 border border-neutral-700 uppercase tracking-wider">
+                    Irányított Mód (Didaktikai)
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="text-left sm:text-right font-mono text-xs space-y-1">

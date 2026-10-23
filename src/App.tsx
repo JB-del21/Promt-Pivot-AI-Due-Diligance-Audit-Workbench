@@ -25,6 +25,9 @@ export default function App() {
   // Primary navigation view: 'WORKBENCH' (the redlining workbench or report) | 'COHORT' (the cohort dashboard)
   const [activeView, setActiveView] = useState<'WORKBENCH' | 'COHORT'>('WORKBENCH');
 
+  // Didactic difficulty mode: true = Strict / Blind (no bold helpers), false = Guided (bold keywords shown)
+  const [isStrictMode, setIsStrictMode] = useState<boolean>(true);
+
   // Audit state
   const [annotations, setAnnotations] = useState<UserAnnotation[]>([]);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
@@ -132,7 +135,8 @@ export default function App() {
       currentScenario.injected_errors,
       annotations,
       elapsedSeconds,
-      currentScenario.scenario_id
+      currentScenario.scenario_id,
+      isStrictMode ? 'STRICT' : 'GUIDED'
     );
     setEvaluation(result);
   };
@@ -230,6 +234,8 @@ export default function App() {
                 if (id) setMobileTab('panel');
               }}
               onAddAnnotation={handleAddAnnotation}
+              isStrictMode={isStrictMode}
+              onToggleStrictMode={() => setIsStrictMode((prev) => !prev)}
             />
           </div>
 

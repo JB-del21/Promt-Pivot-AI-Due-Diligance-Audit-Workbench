@@ -105,6 +105,7 @@ export interface EvaluationResult {
   submittedAt: string;
   elapsedSeconds: number;
   scenarioId: string;
+  auditMode?: 'STRICT' | 'GUIDED';
 }
 
 export const ERROR_TYPE_LABELS: Record<ErrorType, { label: string; shortLabel: string; desc: string; color: string; bg: string; border: string }> = {

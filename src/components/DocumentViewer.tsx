@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Tag, AlertTriangle, HelpCircle, FileText, Sparkles } from 'lucide-react';
+import { Tag, AlertTriangle, HelpCircle, FileText, Sparkles, Eye, EyeOff } from 'lucide-react';
 import type { Scenario, UserAnnotation, ErrorType } from '../types/audit';
 import { ERROR_TYPE_LABELS } from '../types/audit';
 
@@ -9,6 +9,8 @@ interface DocumentViewerProps {
   selectedAnnotationId: string | null;
   onSelectAnnotation: (id: string | null) => void;
   onAddAnnotation: (targetPhrase: string, type: ErrorType) => void;
+  isStrictMode: boolean;
+  onToggleStrictMode: () => void;
 }
 
 interface SelectionBubbleState {
@@ -24,6 +26,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   selectedAnnotationId,
   onSelectAnnotation,
   onAddAnnotation,
+  isStrictMode,
+  onToggleStrictMode,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [bubble, setBubble] = useState<SelectionBubbleState>({
@@ -165,7 +169,11 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         <p key={pIdx} className="text-neutral-300 leading-relaxed text-[15px] mb-5 selection:bg-neutral-700">
           {parts.map((part, partIdx) => {
             if (!part.annotation) {
-              // Check if this text segment contains any of the original bold phrases
+              if (isStrictMode) {
+                return <span key={partIdx}>{part.text}</span>;
+              }
+
+              // In Guided Mode: Check if this text segment contains any of the original bold phrases
               let subSegments: Array<{ text: string; isBold: boolean }> = [{ text: part.text, isBold: false }];
 
               boldMatches.forEach((boldText) => {
@@ -255,18 +263,48 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           <FileText className="w-3.5 h-3.5 text-neutral-400" />
           <span className="font-medium text-neutral-200">AI Szintetikus Dokumentum</span>
           <span className="text-neutral-500">·</span>
-          <span>Kijelölés alapú hibadetektálás (Redlining)</span>
+          <span className="hidden sm:inline">Kijelölés alapú hibadetektálás (Redlining)</span>
         </div>
-        <div className="hidden sm:flex items-center gap-3 text-[11px] text-neutral-400">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Adathiba
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Ellentmondás
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Fiktív forrás
-          </span>
+
+        <div className="flex items-center gap-3">
+          {/* Strict Mode / Didactic Mode Switcher */}
+          <button
+            onClick={onToggleStrictMode}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all ${
+              isStrictMode
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
+                : 'bg-neutral-800 text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-750'
+            }`}
+            title={
+              isStrictMode
+                ? 'Szigorú Mód Aktív: Minden félkövér támpont elrejtve. Kattints az Irányított Módra váltáshoz!'
+                : 'Irányított Mód: Félkövér kiemelések segítik a tanulást. Kattints a Vak Munkalapra (Szigorú) váltáshoz!'
+            }
+          >
+            {isStrictMode ? (
+              <>
+                <EyeOff className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span className="font-semibold">Vak Munkalap (Szigorú)</span>
+              </>
+            ) : (
+              <>
+                <Eye className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Irányított (Félkövér)</span>
+              </>
+            )}
+          </button>
+
+          <div className="hidden lg:flex items-center gap-3 text-[11px] text-neutral-400 border-l border-neutral-800 pl-3">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Adathiba
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Ellentmondás
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Fiktív forrás
+            </span>
+          </div>
         </div>
       </div>
 
@@ -322,18 +360,40 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           </div>
         )}
 
-        {/* Informational Callout: Instructions */}
-        <div className="mb-6 p-3 rounded bg-neutral-950/60 border border-neutral-800/80 text-xs text-neutral-300 flex items-start gap-2.5">
-          <div className="w-4 h-4 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 mt-0.5 text-amber-400 font-mono text-[10px]">
-            i
-          </div>
-          <div className="leading-relaxed">
-            <span className="font-semibold text-neutral-200">Auditori Feladat: </span>
-            Jelöld ki az egérrel a szövegben a gyanús állításokat, számítási hibákat vagy hallucinációkat!
-            A felugró buborékban válaszd ki a hiba kategóriáját, majd a jobb oldali panelen rögzítsd az indoklást.
-            <span className="text-neutral-400 block mt-1 font-mono text-[11px]">
-              Vigyázz: A valós állítások téves bejelölése (False Positive) -20 pont levonással jár!
-            </span>
+        {/* Informational Callout: Instructions & Mode Indicator */}
+        <div
+          className={`mb-6 p-3.5 rounded-lg border text-xs leading-relaxed transition-all ${
+            isStrictMode
+              ? 'bg-rose-950/20 border-rose-900/40 text-rose-200'
+              : 'bg-neutral-950/60 border-neutral-800/80 text-neutral-300'
+          }`}
+        >
+          <div className="flex items-start gap-2.5">
+            {isStrictMode ? (
+              <EyeOff className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            ) : (
+              <div className="w-4 h-4 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 mt-0.5 text-amber-400 font-mono text-[10px]">
+                i
+              </div>
+            )}
+            <div>
+              <div className="font-semibold text-white flex items-center gap-2">
+                <span>{isStrictMode ? 'Szigorú Mód Aktív (Vak Munkalap):' : 'Irányított Mód (Didaktikai Segédlet):'}</span>
+                {isStrictMode && (
+                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                    Real-World Audit
+                  </span>
+                )}
+              </div>
+              <p className="mt-1">
+                {isStrictMode
+                  ? 'Minden vizuális támpont és félkövér formázás el van rejtve. Az állításokat valódi átvilágítóként, a teljes folyószöveg önálló elemzésével és manuális kijelölésével kell beazonosítanod.'
+                  : 'A beültetett lehetséges anomáliákat félkövér kiemelés jelzi a gyorsabb tanulásért. Kattints a kiemelt kifejezésekre, vagy válts a jobb felső sarokban a Vak Munkalapra a szigorúbb vizsgakörülményekhez!'}
+              </p>
+              <span className="text-neutral-400 block mt-1.5 font-mono text-[11px]">
+                Szigorú értékelés: A helyes állítások téves bejelölése (False Positive) -20 pont levonással jár!
+              </span>
+            </div>
           </div>
         </div>
 
