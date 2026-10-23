@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   Cpu,
+  Users,
 } from 'lucide-react';
 import type { Scenario, EvaluationResult } from '../types/audit';
 
@@ -25,6 +26,7 @@ interface AuditReportViewProps {
   onReset: () => void;
   onSelectNextScenario?: () => void;
   onOpenBenchmark?: () => void;
+  onOpenCohort?: () => void;
 }
 
 export const AuditReportView: React.FC<AuditReportViewProps> = ({
@@ -33,6 +35,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
   onReset,
   onSelectNextScenario,
   onOpenBenchmark,
+  onOpenCohort,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
@@ -144,6 +147,16 @@ ${evaluation.detailedMatches
               >
                 <Cpu className="w-3.5 h-3.5 text-purple-400" />
                 <span>AI Benchmark Aréna</span>
+              </button>
+            )}
+
+            {onOpenCohort && (
+              <button
+                onClick={onOpenCohort}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all font-medium"
+              >
+                <Users className="w-3.5 h-3.5 text-amber-400" />
+                <span>Kohorsz Hőtérkép</span>
               </button>
             )}
 

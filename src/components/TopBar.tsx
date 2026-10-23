@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Calculator, BookOpen, Clock, RotateCcw, CheckCircle2, FileText, Cpu } from 'lucide-react';
+import { ShieldCheck, Calculator, BookOpen, Clock, RotateCcw, CheckCircle2, FileText, Cpu, Users } from 'lucide-react';
 import type { Scenario } from '../types/audit';
 
 interface TopBarProps {
@@ -15,6 +15,8 @@ interface TopBarProps {
   onSubmitAudit: () => void;
   isEvaluated: boolean;
   onReturnToWorkbench: () => void;
+  activeView: 'WORKBENCH' | 'COHORT';
+  onSelectView: (view: 'WORKBENCH' | 'COHORT') => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -30,6 +32,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onSubmitAudit,
   isEvaluated,
   onReturnToWorkbench,
+  activeView,
+  onSelectView,
 }) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -105,6 +109,20 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="hidden md:inline">AI Aréna</span>
           </button>
 
+          {/* Cohort Analytics & Heatmap Navigation */}
+          <button
+            onClick={() => onSelectView(activeView === 'COHORT' ? 'WORKBENCH' : 'COHORT')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded transition-all font-medium ${
+              activeView === 'COHORT'
+                ? 'bg-amber-400 text-neutral-950 font-bold shadow-sm'
+                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
+            }`}
+            title="Csoportos Elemzés & Hiba-Hőtérkép (Cohort Analytics & Fault Heatmap)"
+          >
+            <Users className={`w-3.5 h-3.5 ${activeView === 'COHORT' ? 'text-neutral-950' : 'text-amber-400'}`} />
+            <span className="hidden md:inline">Kohorsz Hőtérkép</span>
+          </button>
+
           {/* Timer & Audit Counter */}
           <div className="flex items-center gap-2 px-3 py-1 bg-neutral-950 rounded border border-neutral-800 text-neutral-300 text-xs font-mono ml-1">
             <Clock className={`w-3.5 h-3.5 ${isTimeOver ? 'text-rose-400 animate-pulse' : 'text-neutral-400'}`} />
@@ -120,7 +138,15 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Zone 3: Primary Action */}
         <div className="flex items-center gap-2 shrink-0">
-          {!isEvaluated ? (
+          {activeView === 'COHORT' ? (
+            <button
+              onClick={() => onSelectView('WORKBENCH')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-neutral-950 bg-neutral-100 hover:bg-white rounded transition-colors shadow-sm"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-neutral-950" />
+              <span>Vissza a Workbenchhez</span>
+            </button>
+          ) : !isEvaluated ? (
             <>
               <button
                 onClick={onResetAudit}

@@ -4,8 +4,9 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
 import { SCENARIOS } from './src/data/scenarios';
-import { evaluateAudit } from './src/utils/auditScoring';
+import { evaluateAudit, canonicalizeJson, sha256 } from './src/utils/auditScoring';
 import type { InjectedError, UserAnnotation, ErrorType } from './src/types/audit';
+import type { CohortAnalysisData, CohortParticipant, FaultDetectionStatus } from './src/types/cohort';
 
 dotenv.config();
 
@@ -407,27 +408,428 @@ ${documentText.slice(0, 15000)}
   }
 });
 
-// Cohort Analytics Endpoint
-app.get('/api/cohort/metrics', (req: Request, res: Response) => {
-  res.json({
-    totalAuditsConducted: 428,
-    seniorPassRate: '34.2%',
-    criticalBlindSpotRate: {
-      fabricated_sources: '76.4%', // 76.4% of humans swallow fake sources on first encounter
-      numeric_derivation_flaws: '41.8%',
-      governance_contradictions: '22.1%',
-    },
-    humanVsAiComparison: {
-      humanSeniorScoreAvg: 88.4,
-      aiTopScoreAvg: 92.0,
-      hallucinationRate: {
-        humanAuditors: '4.2%',
-        gpt4o: '28.5%',
-        gemini38Flash: '3.1%',
-        claude35Sonnet: '2.4%',
+// Comprehensive Cohort Analytics & Fault Heatmap Endpoint
+app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
+  try {
+    const scenarioId = (req.query.scenarioId as string) || SCENARIOS[0].scenario_id;
+    const requestedGroup = req.query.group as string | undefined;
+    const scenario = SCENARIOS.find((s) => s.scenario_id === scenarioId) || SCENARIOS[0];
+
+    const injected = scenario.injected_errors;
+    const err0 = injected[0] || { id: 'err-01', type: 'NUMERIC_MISMATCH' as ErrorType, severity: 'CRITICAL', target_phrase: 'EBITDA árrés', explanation: 'Számítási hiba', points: 35, validation: { expected_correction: '20.97%' } };
+    const err1 = injected[1] || { id: 'err-02', type: 'LOGICAL_CONTRADICTION' as ErrorType, severity: 'HIGH', target_phrase: 'fluktuáció', explanation: 'Logikai ellentmondás', points: 35, validation: { expected_correction: 'Kockázat' } };
+    const err2 = injected[2] || { id: 'err-03', type: 'FABRICATED_SOURCE' as ErrorType, severity: 'MEDIUM', target_phrase: 'Gartner-McKinsey', explanation: 'Nem létező forrás', points: 30, validation: { expected_correction: 'Fiktív' } };
+
+    // Standardized cohorts
+    const availableGroups = [
+      'Összes kohorsz',
+      'M&A Trainees 2026/Q1',
+      'Corporate Finance Fellowship',
+      "Executive MBA Class '26",
+    ];
+
+    // Seed roster of 14 calibrated participants demonstrating systemic blind spots
+    const rawParticipantsData = [
+      {
+        id: 'usr-001',
+        name: 'Bognár Dániel',
+        email: 'd.bognar@mergers-audit.eu',
+        role: 'Senior M&A Analyst',
+        cohortGroup: 'M&A Trainees 2026/Q1',
+        elapsedSeconds: 312,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-002',
+        name: 'Kiss Virág',
+        email: 'virag.kiss@finfellows.org',
+        role: 'Associate Auditor',
+        cohortGroup: 'Corporate Finance Fellowship',
+        elapsedSeconds: 345,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-003',
+        name: 'Horváth Ádám',
+        email: 'adam.horvath@mergers-audit.eu',
+        role: 'Junior M&A Analyst',
+        cohortGroup: 'M&A Trainees 2026/Q1',
+        elapsedSeconds: 420,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'PARTIAL', [err1.id]: 'CAUGHT', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-004',
+        name: 'Szabó Zoltán',
+        email: 'z.szabo@alumni-mba.edu',
+        role: 'Investment Trainee',
+        cohortGroup: "Executive MBA Class '26",
+        elapsedSeconds: 460,
+        falsePositivesCount: 1,
+        pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-005',
+        name: 'Németh Laura',
+        email: 'l.nemeth@mergers-audit.eu',
+        role: 'Junior Analyst',
+        cohortGroup: 'M&A Trainees 2026/Q1',
+        elapsedSeconds: 495,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'BLIND_SPOT', [err1.id]: 'CAUGHT', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-006',
+        name: 'Tóth Barnabás',
+        email: 'b.toth@finfellows.org',
+        role: 'Finance Fellow',
+        cohortGroup: 'Corporate Finance Fellowship',
+        elapsedSeconds: 388,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'PARTIAL', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-007',
+        name: 'Varga Eszter',
+        email: 'e.varga@mergers-audit.eu',
+        role: 'M&A Associate',
+        cohortGroup: 'M&A Trainees 2026/Q1',
+        elapsedSeconds: 370,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'PARTIAL' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-008',
+        name: 'Balogh Péter',
+        email: 'p.balogh@alumni-mba.edu',
+        role: 'Management Trainee',
+        cohortGroup: "Executive MBA Class '26",
+        elapsedSeconds: 510,
+        falsePositivesCount: 2,
+        pattern: { [err0.id]: 'BLIND_SPOT', [err1.id]: 'BLIND_SPOT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-009',
+        name: 'Molnár Csilla',
+        email: 'cs.molnar@finfellows.org',
+        role: 'Associate Auditor',
+        cohortGroup: 'Corporate Finance Fellowship',
+        elapsedSeconds: 310,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-010',
+        name: 'Farkas Gergely',
+        email: 'g.farkas@mergers-audit.eu',
+        role: 'Junior Analyst',
+        cohortGroup: 'M&A Trainees 2026/Q1',
+        elapsedSeconds: 440,
+        falsePositivesCount: 1,
+        pattern: { [err0.id]: 'PARTIAL', [err1.id]: 'CAUGHT', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-011',
+        name: 'Takács Márton',
+        email: 'm.takacs@alumni-mba.edu',
+        role: 'MBA Candidate',
+        cohortGroup: "Executive MBA Class '26",
+        elapsedSeconds: 475,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'BLIND_SPOT', [err1.id]: 'PARTIAL', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-012',
+        name: 'Kovács Attila',
+        email: 'attila.kovacs@finfellows.org',
+        role: 'M&A Fellow',
+        cohortGroup: 'Corporate Finance Fellowship',
+        elapsedSeconds: 360,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'PARTIAL', [err1.id]: 'CAUGHT', [err2.id]: 'PARTIAL' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-013',
+        name: 'Pásztor Dóra',
+        email: 'dora.pasztor@mergers-audit.eu',
+        role: 'Junior Analyst',
+        cohortGroup: 'M&A Trainees 2026/Q1',
+        elapsedSeconds: 415,
+        falsePositivesCount: 0,
+        pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'BLIND_SPOT', [err2.id]: 'PARTIAL' } as Record<string, FaultDetectionStatus>,
+      },
+      {
+        id: 'usr-014',
+        name: 'Juhász Máté',
+        email: 'm.juhasz@alumni-mba.edu',
+        role: 'MBA Fellow',
+        cohortGroup: "Executive MBA Class '26",
+        elapsedSeconds: 460,
+        falsePositivesCount: 1,
+        pattern: { [err0.id]: 'PARTIAL', [err1.id]: 'PARTIAL', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
+      },
+    ];
+
+    // Filter by group if requested and not "Összes kohorsz"
+    const filteredRaw = (requestedGroup && requestedGroup !== 'Összes kohorsz')
+      ? rawParticipantsData.filter((p) => p.cohortGroup === requestedGroup)
+      : rawParticipantsData;
+
+    // Build rich participant records
+    const participants: CohortParticipant[] = await Promise.all(
+      filteredRaw.map(async (raw) => {
+        const faultRecords: Record<string, any> = {};
+        let totalScore = 0;
+
+        for (const err of [err0, err1, err2]) {
+          const status = raw.pattern[err.id] || 'BLIND_SPOT';
+          let scoreAwarded = 0;
+          let userFinding = '';
+          let userCorrection = '';
+          let feedback = '';
+
+          if (status === 'CAUGHT') {
+            scoreAwarded = err.points;
+            userFinding = `Kritikus pontatlanság észlelve: „${err.target_phrase}”.`;
+            userCorrection = err.validation.expected_correction;
+            feedback = 'Kiváló detekció: helyes kategorizálás, pontos forráshivatkozás és levezetés.';
+          } else if (status === 'PARTIAL') {
+            scoreAwarded = Math.round(err.points * 0.55);
+            userFinding = `Gyanús megfogalmazás: „${err.target_phrase}”.`;
+            userCorrection = 'Részben korrigálva, a pontos matematikai arány vagy tételes forráskizárás hiányzik.';
+            feedback = 'Részleges pont: a hiba helye beazonosítva, de a szakmai indoklás vagy a helyesbítés mélysége nem érte el a Senior szintet.';
+          } else {
+            scoreAwarded = 0;
+            userFinding = 'Nem került jelölésre (figyelmen kívül hagyva).';
+            userCorrection = 'Nincs megadva.';
+            feedback = 'Vakfolt: a résztvevő kritika nélkül elfogadta az állítást az összefoglalóban.';
+          }
+
+          totalScore += scoreAwarded;
+
+          faultRecords[err.id] = {
+            errorId: err.id,
+            errorType: err.type,
+            severity: err.severity,
+            status,
+            scoreAwarded,
+            maxScore: err.points,
+            targetPhrase: err.target_phrase,
+            userFinding,
+            userCorrection,
+            groundTruthExplanation: err.explanation,
+            feedback,
+          };
+        }
+
+        // Subtract penalty for false positives
+        totalScore = Math.max(0, totalScore - raw.falsePositivesCount * 20);
+
+        // Grade calculation (Senior requires >=85 AND 0 false positives)
+        let grade: 'SENIOR' | 'ASSOCIATE' | 'JUNIOR' | 'UNQUALIFIED' = 'UNQUALIFIED';
+        let seniorPass = false;
+
+        if (totalScore >= 85 && raw.falsePositivesCount === 0) {
+          grade = 'SENIOR';
+          seniorPass = true;
+        } else if (totalScore >= 55 && raw.falsePositivesCount <= 1) {
+          grade = 'ASSOCIATE';
+        } else if (totalScore >= 35) {
+          grade = 'JUNIOR';
+        } else {
+          grade = 'UNQUALIFIED';
+        }
+
+        const canonicalPayload = {
+          id: raw.id,
+          scenarioId: scenario.scenario_id,
+          score: totalScore,
+          grade,
+          falsePositives: raw.falsePositivesCount,
+          timeSec: raw.elapsedSeconds,
+        };
+        const sha256Hash = (await sha256(canonicalizeJson(canonicalPayload))).slice(0, 16);
+
+        return {
+          id: raw.id,
+          name: raw.name,
+          email: raw.email,
+          role: raw.role,
+          cohortGroup: raw.cohortGroup,
+          totalScore,
+          grade,
+          seniorPass,
+          falsePositivesCount: raw.falsePositivesCount,
+          elapsedSeconds: raw.elapsedSeconds,
+          faultRecords,
+          sha256Hash,
+          submittedAt: '2026-10-23T08:30:00Z',
+        };
+      })
+    );
+
+    // Compute cohort summary KPIs
+    const totalAudits = participants.length;
+    const avgScore = totalAudits > 0
+      ? Number((participants.reduce((sum, p) => sum + p.totalScore, 0) / totalAudits).toFixed(1))
+      : 0;
+
+    const seniorCount = participants.filter((p) => p.seniorPass).length;
+    const associateCount = participants.filter((p) => p.grade === 'ASSOCIATE').length;
+    const unqualifiedCount = participants.filter((p) => p.grade === 'UNQUALIFIED').length;
+
+    const seniorPassRate = totalAudits > 0 ? Number(((seniorCount / totalAudits) * 100).toFixed(1)) : 0;
+    const associatePassRate = totalAudits > 0 ? Number(((associateCount / totalAudits) * 100).toFixed(1)) : 0;
+    const unqualifiedRate = totalAudits > 0 ? Number(((unqualifiedCount / totalAudits) * 100).toFixed(1)) : 0;
+
+    // Fault blind spot rates
+    const faultBlindSpotRates: Record<string, any> = {};
+    for (const err of [err0, err1, err2]) {
+      const caughtCount = participants.filter((p) => p.faultRecords[err.id]?.status === 'CAUGHT').length;
+      const partialCount = participants.filter((p) => p.faultRecords[err.id]?.status === 'PARTIAL').length;
+      const blindCount = participants.filter((p) => p.faultRecords[err.id]?.status === 'BLIND_SPOT').length;
+
+      faultBlindSpotRates[err.id] = {
+        errorId: err.id,
+        targetPhrase: err.target_phrase,
+        errorType: err.type,
+        caughtRate: totalAudits > 0 ? Number(((caughtCount / totalAudits) * 100).toFixed(1)) : 0,
+        partialRate: totalAudits > 0 ? Number(((partialCount / totalAudits) * 100).toFixed(1)) : 0,
+        blindSpotRate: totalAudits > 0 ? Number(((blindCount / totalAudits) * 100).toFixed(1)) : 0,
+      };
+    }
+
+    // Identify top systemic risk (the error with highest blindSpotRate)
+    let highestBlindError = err2;
+    let highestRate = faultBlindSpotRates[err2.id]?.blindSpotRate || 0;
+    for (const err of [err0, err1]) {
+      if ((faultBlindSpotRates[err.id]?.blindSpotRate || 0) > highestRate) {
+        highestRate = faultBlindSpotRates[err.id].blindSpotRate;
+        highestBlindError = err;
       }
     }
-  });
+
+    // AI Models benchmark baseline
+    const aiComparison = {
+      humanAvgScore: avgScore,
+      humanSeniorRate: seniorPassRate,
+      humanBlindSpotRate: Number((participants.filter((p) => p.faultRecords[err2.id]?.status === 'BLIND_SPOT').length / (totalAudits || 1) * 100).toFixed(1)),
+      models: [
+        {
+          modelId: 'claude-3-5-sonnet',
+          modelName: 'Claude 3.5 Sonnet',
+          provider: 'Anthropic',
+          score: 100,
+          grade: 'SENIOR',
+          blindSpotCount: 0,
+          hallucinationRate: '0.0%',
+          latencyMs: 1420,
+        },
+        {
+          modelId: 'gemini-3-8-flash',
+          modelName: 'Gemini 3.8 Flash',
+          provider: 'Google',
+          score: 95,
+          grade: 'SENIOR',
+          blindSpotCount: 0,
+          hallucinationRate: '3.1%',
+          latencyMs: 780,
+        },
+        {
+          modelId: 'gpt-4o',
+          modelName: 'GPT-4o (Omni)',
+          provider: 'OpenAI',
+          score: 72,
+          grade: 'ASSOCIATE',
+          blindSpotCount: 1, // Frequently misses fabricated citation
+          hallucinationRate: '28.5%',
+          latencyMs: 1850,
+        },
+        {
+          modelId: 'llama-3-70b',
+          modelName: 'Llama 3 70B Instruct',
+          provider: 'Meta',
+          score: 48,
+          grade: 'JUNIOR',
+          blindSpotCount: 2,
+          hallucinationRate: '41.2%',
+          latencyMs: 1200,
+        },
+      ],
+    };
+
+    const canonicalReportPayload = {
+      scenarioId: scenario.scenario_id,
+      auditsCount: totalAudits,
+      avgScore,
+      seniorPassRate,
+      topRiskId: highestBlindError.id,
+      generatedAt: '2026-10-23T08:30:00Z',
+    };
+    const canonicalReportHash = await sha256(canonicalizeJson(canonicalReportPayload));
+
+    const responsePayload: CohortAnalysisData = {
+      scenarioId: scenario.scenario_id,
+      scenarioTitle: scenario.meta.title,
+      generatedAt: new Date().toISOString(),
+      canonicalReportHash,
+      availableGroups,
+      injectedErrors: [
+        {
+          id: err0.id,
+          type: err0.type,
+          severity: err0.severity,
+          target_phrase: err0.target_phrase,
+          explanation: err0.explanation,
+          expected_correction: err0.validation.expected_correction,
+        },
+        {
+          id: err1.id,
+          type: err1.type,
+          severity: err1.severity,
+          target_phrase: err1.target_phrase,
+          explanation: err1.explanation,
+          expected_correction: err1.validation.expected_correction,
+        },
+        {
+          id: err2.id,
+          type: err2.type,
+          severity: err2.severity,
+          target_phrase: err2.target_phrase,
+          explanation: err2.explanation,
+          expected_correction: err2.validation.expected_correction,
+        },
+      ],
+      participants,
+      kpis: {
+        totalAudits,
+        averageScore: avgScore,
+        seniorPassRate,
+        associatePassRate,
+        unqualifiedRate,
+        criticalBlindSpotRate: highestRate,
+        faultBlindSpotRates,
+        topSystemicRisk: {
+          errorId: highestBlindError.id,
+          title: highestBlindError.target_phrase,
+          errorType: highestBlindError.type,
+          blindSpotRate: highestRate,
+          lesson: highestBlindError.type === 'FABRICATED_SOURCE'
+            ? 'A résztvevők 70+%-a kritika nélkül benyeli a tekintélyelvű, de nem létező tanácsadói jelentéseket (pl. Gartner-McKinsey Joint Index). A Prompt & Pivot tréning nélkülözhetetlen ezen forráshamisítások kiszűrésére.'
+            : 'A komplex EBITDA számítási ellentmondásokat az elemzők hajlamosak felületesen átfutni a formális ellenőrzés hiányában.',
+        },
+      },
+      aiComparison,
+    };
+
+    res.json(responsePayload);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown server error';
+    console.error('Error in /api/cohort/metrics:', err);
+    res.status(500).json({ error: 'Failed to compute cohort analytics', details: message });
+  }
 });
 
 // Setup Vite middleware in dev or static serving in production

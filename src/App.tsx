@@ -16,10 +16,14 @@ import { ScenarioSelectorModal } from './components/ScenarioSelectorModal';
 import { SystemDocumentationModal } from './components/SystemDocumentationModal';
 import { AIBenchmarkModal } from './components/AIBenchmarkModal';
 import { AuditReportView } from './components/AuditReportView';
+import { CohortDashboardView } from './components/CohortDashboardView';
 
 export default function App() {
   // Scenario state
   const [currentScenario, setCurrentScenario] = useState<Scenario>(SCENARIOS[0]);
+
+  // Primary navigation view: 'WORKBENCH' (the redlining workbench or report) | 'COHORT' (the cohort dashboard)
+  const [activeView, setActiveView] = useState<'WORKBENCH' | 'COHORT'>('WORKBENCH');
 
   // Audit state
   const [annotations, setAnnotations] = useState<UserAnnotation[]>([]);
@@ -167,11 +171,25 @@ export default function App() {
         onResetAudit={handleResetAudit}
         onSubmitAudit={handleSubmitAudit}
         isEvaluated={Boolean(evaluation)}
-        onReturnToWorkbench={() => setEvaluation(null)}
+        onReturnToWorkbench={() => {
+          setEvaluation(null);
+          setActiveView('WORKBENCH');
+        }}
+        activeView={activeView}
+        onSelectView={setActiveView}
       />
 
       {/* Main Content Area */}
-      {!evaluation ? (
+      {activeView === 'COHORT' ? (
+        <CohortDashboardView
+          currentScenario={currentScenario}
+          onReturnToWorkbench={() => setActiveView('WORKBENCH')}
+          onSelectScenario={(scenarioId) => {
+            const s = SCENARIOS.find((item) => item.scenario_id === scenarioId);
+            if (s) handleSelectScenario(s);
+          }}
+        />
+      ) : !evaluation ? (
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
           {/* Mobile view toggle strip */}
           <div className="flex lg:hidden items-center border-b border-neutral-800 bg-neutral-950 px-4 py-2 gap-2 text-xs select-none">
@@ -241,6 +259,7 @@ export default function App() {
           onReset={handleResetAudit}
           onSelectNextScenario={handleSelectNextScenario}
           onOpenBenchmark={() => setIsBenchmarkModalOpen(true)}
+          onOpenCohort={() => setActiveView('COHORT')}
         />
       )}
 
