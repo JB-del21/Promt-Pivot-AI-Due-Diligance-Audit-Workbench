@@ -26,6 +26,7 @@ app.use(express.json({ limit: '1mb' }));
 declare global {
   namespace Express {
     interface Request {
+      userId: string;
       tenantId: string;
     }
   }
@@ -42,13 +43,14 @@ const requireApiAuth = async (req: Request, res: Response, next: NextFunction) =
         audience:process.env.AUTH_JWT_AUDIENCE,
       });
   if (auth.ok === false) return res.status(auth.status).json({ error: auth.error });
+  req.userId = auth.principal.userId;
   req.tenantId = auth.principal.tenantId;
   next();
  } catch { res.status(503).json({ error: 'Identity service unavailable' }); }
 };
 app.get('/api/session', requireApiAuth, (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ tenantId: req.tenantId, authenticated: true });
+  res.json({ userId: req.userId, tenantId: req.tenantId, authenticated: true });
 });
 app.use('/api/reports',requireApiAuth);
 app.use('/api/cohort',requireApiAuth);
