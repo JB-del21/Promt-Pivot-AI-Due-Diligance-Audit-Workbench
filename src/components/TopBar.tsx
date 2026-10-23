@@ -63,12 +63,12 @@ export const TopBar: React.FC = () => {
           </button>
         </div>
 
-        {/* Zone 2: Navigation & Diagnostic Tools */}
-        <nav className="flex items-center gap-1 sm:gap-2 text-xs font-medium text-neutral-200">
+        {/* Zone 2: Navigation & Diagnostic Tools - Scrollable on narrow mobile */}
+        <nav className="flex items-center gap-1 sm:gap-2 text-xs font-medium text-neutral-200 overflow-x-auto no-scrollbar py-1 max-w-full">
           {/* User History & Certificate Log */}
           <button
             onClick={() => setIsHistoryModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="flex items-center gap-1.5 px-2.5 py-2 sm:py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all font-medium shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[36px] sm:min-h-0"
             title="Előzmények & SHA-256 Audit Tanúsítványok"
           >
             <History className="w-3.5 h-3.5 text-emerald-400" />
@@ -77,7 +77,7 @@ export const TopBar: React.FC = () => {
 
           <button
             onClick={() => setIsCalculatorOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-neutral-800 text-neutral-200 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="flex items-center gap-1.5 px-2.5 py-2 sm:py-1.5 rounded hover:bg-neutral-800 text-neutral-200 hover:text-white transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[36px] sm:min-h-0"
             title="Pénzügyi és megtérülési gyorstesztelő"
           >
             <Calculator className="w-3.5 h-3.5 text-neutral-300" />
@@ -86,7 +86,7 @@ export const TopBar: React.FC = () => {
 
           <button
             onClick={() => setIsDocumentationModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-neutral-800 text-neutral-200 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="flex items-center gap-1.5 px-2.5 py-2 sm:py-1.5 rounded hover:bg-neutral-800 text-neutral-200 hover:text-white transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[36px] sm:min-h-0"
             title="Rendszerdokumentáció, kiértékelési szabályzat és korlátok"
           >
             <FileText className="w-3.5 h-3.5 text-neutral-300" />
@@ -95,7 +95,7 @@ export const TopBar: React.FC = () => {
 
           <button
             onClick={() => setIsPodcastModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-neutral-800 text-neutral-200 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="flex items-center gap-1.5 px-2.5 py-2 sm:py-1.5 rounded hover:bg-neutral-800 text-neutral-200 hover:text-white transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[36px] sm:min-h-0"
             title="Világgazdaság podcast háttér és módszertan"
           >
             <BookOpen className="w-3.5 h-3.5 text-neutral-300" />
@@ -104,7 +104,7 @@ export const TopBar: React.FC = () => {
 
           <button
             onClick={() => setIsBenchmarkModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition-all font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="flex items-center gap-1.5 px-2.5 py-2 sm:py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition-all font-medium shrink-0 focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[36px] sm:min-h-0"
             title="AI Benchmark Aréna: Humán Auditor vs. Gemini / Claude / GPT-4o"
           >
             <Cpu className="w-3.5 h-3.5 text-purple-400" />
@@ -114,7 +114,7 @@ export const TopBar: React.FC = () => {
           {/* Cohort Analytics & Heatmap Navigation */}
           <button
             onClick={() => setActiveView(activeView === 'COHORT' ? 'WORKBENCH' : 'COHORT')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded transition-all font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+            className={`flex items-center gap-1.5 px-2.5 py-2 sm:py-1.5 rounded transition-all font-medium shrink-0 focus:outline-none focus:ring-2 focus:ring-amber-400 min-h-[36px] sm:min-h-0 ${
               activeView === 'COHORT'
                 ? 'bg-amber-400 text-neutral-950 font-bold shadow-sm'
                 : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
@@ -126,14 +126,14 @@ export const TopBar: React.FC = () => {
           </button>
 
           {/* Timer & Audit Counter */}
-          <div className="flex items-center gap-2 px-3 py-1 bg-neutral-950 rounded border border-neutral-800 text-neutral-200 text-xs font-mono ml-1">
+          <div className="flex items-center gap-2 px-3 py-1.5 sm:py-1 bg-neutral-950 rounded border border-neutral-800 text-neutral-200 text-xs font-mono ml-1 shrink-0">
             <Clock className={`w-3.5 h-3.5 ${isTimeOver ? 'text-rose-400 animate-pulse' : 'text-neutral-400'}`} />
             <span className={isTimeOver ? 'text-rose-400 font-semibold' : ''}>
               {formatTime(elapsedSeconds)}
             </span>
             <span className="text-neutral-600">/</span>
             <span className="text-neutral-300" title="Jelölt gyanús pontok">
-              {annotations.length} jelölve
+              {annotations.length}
             </span>
           </div>
         </nav>

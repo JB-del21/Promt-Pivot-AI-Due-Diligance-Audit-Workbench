@@ -33,7 +33,7 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
   onSubmitAudit,
 }) => {
   return (
-    <aside className="w-full lg:w-[480px] xl:w-[520px] bg-neutral-950 border-l border-neutral-800 flex flex-col h-full overflow-hidden select-none">
+    <aside className="w-full lg:w-[480px] xl:w-[520px] bg-neutral-950 border-t lg:border-t-0 lg:border-l border-neutral-800 flex flex-col h-full overflow-hidden select-none">
       {/* Pane Subheader */}
       <div className="px-5 py-2.5 border-b border-neutral-800 bg-neutral-900/60 flex items-center justify-between text-xs text-neutral-400">
         <div className="flex items-center gap-2">

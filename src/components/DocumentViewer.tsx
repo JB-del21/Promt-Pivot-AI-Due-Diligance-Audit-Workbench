@@ -37,10 +37,9 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     y: 0,
   });
 
-  // Listen to text selection inside the document container
+  // Listen to text selection inside the document container (mouse and touch events)
   useEffect(() => {
-    const handleMouseUp = (e: MouseEvent) => {
-      // If clicking inside the selection bubble, do not dismiss!
+    const handleSelectionChange = (e: Event) => {
       const bubbleEl = document.getElementById('selection-bubble');
       if (bubbleEl && (bubbleEl.contains(e.target as Node) || bubbleEl === e.target)) {
         return;
@@ -83,18 +82,22 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
       }
     };
 
-    const handleMouseDown = (e: MouseEvent) => {
+    const handleStart = (e: Event) => {
       const bubbleEl = document.getElementById('selection-bubble');
       if (bubbleEl && (bubbleEl.contains(e.target as Node) || bubbleEl === e.target)) {
         return;
       }
     };
 
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleSelectionChange);
+    document.addEventListener('touchend', handleSelectionChange);
+    document.addEventListener('mousedown', handleStart);
+    document.addEventListener('touchstart', handleStart);
     return () => {
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mouseup', handleSelectionChange);
+      document.removeEventListener('touchend', handleSelectionChange);
+      document.removeEventListener('mousedown', handleStart);
+      document.removeEventListener('touchstart', handleStart);
     };
   }, []);
 
@@ -331,31 +334,34 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
             <button
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onClick={() => handleSelectType('NUMERIC_MISMATCH')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 transition-colors font-medium"
+              className="flex items-center gap-1.5 px-3 py-2 sm:py-1 rounded text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 transition-colors font-medium min-h-[38px] sm:min-h-0"
               title="Számítási hiba, rossz árrés vagy szorzó"
             >
-              <Tag className="w-3 h-3 text-rose-400" />
+              <Tag className="w-3.5 h-3.5 text-rose-400" />
               <span>Adathiba</span>
             </button>
 
             <button
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onClick={() => handleSelectType('LOGICAL_CONTRADICTION')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 transition-colors font-medium"
+              className="flex items-center gap-1.5 px-3 py-2 sm:py-1 rounded text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 transition-colors font-medium min-h-[38px] sm:min-h-0"
               title="A szöveg belső logikai ellentmondása"
             >
-              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
               <span>Ellentmondás</span>
             </button>
 
             <button
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onClick={() => handleSelectType('FABRICATED_SOURCE')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-colors font-medium"
+              className="flex items-center gap-1.5 px-3 py-2 sm:py-1 rounded text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-colors font-medium min-h-[38px] sm:min-h-0"
               title="Hallucinált vagy nem létező benchmarking hivatkozás"
             >
-              <HelpCircle className="w-3 h-3 text-indigo-400" />
+              <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
               <span>Fiktív forrás</span>
             </button>
           </div>

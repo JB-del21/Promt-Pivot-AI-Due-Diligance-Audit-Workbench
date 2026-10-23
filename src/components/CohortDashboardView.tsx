@@ -481,6 +481,12 @@ export const CohortDashboardView: React.FC<CohortDashboardViewProps> = ({
               </div>
             </div>
 
+            {/* Mobile Swipe Hint */}
+            <div className="lg:hidden px-4 py-2 bg-neutral-950/90 border-b border-neutral-800 text-[11px] text-amber-400 font-mono flex items-center justify-between">
+              <span>Görgess jobbra a teljes hőtérkép mátrixhoz →</span>
+              <span>{filteredParticipants.length} fő</span>
+            </div>
+
             {/* Matrix Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
