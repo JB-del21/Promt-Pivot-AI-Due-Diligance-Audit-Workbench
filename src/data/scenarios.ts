@@ -251,4 +251,87 @@ A likviditási pufferek allokációjához a menedzsment a legújabb **EBA/GL/202
       'Valós szabályozói keret: Basel III / CRR III rendelet',
     ],
   },
+  {
+    scenario_id: 'mna-ai-startup-ip-royalty-2026',
+    meta: {
+      title: 'Project GenAI IP – DeepTech Startup Akvizíció & Szellemi Tulajdon Audit',
+      domain: 'DeepTech / AI Startup & IP Jogdíj Átvilágítás',
+      difficulty: 'Haladó / M&A',
+      time_limit_sec: 450,
+      summary: 'AI-modell licencelési és szellemi tulajdon (IP) M&A átvilágítás, ahol az LLM finomhangolási kötelezettségeket, a GPL Copyleft kockázatokat és a jogdíj-árréseket vizsgálja az auditor.',
+    },
+    context: {
+      target_name: 'Cognitive Core AI Labs Kft.',
+      arr: '$8.5M',
+      opex: '$4.6M',
+      headcount: 36,
+      accounting_methodology_note: 'IP Jogdíj és Licenc-árrés kalkuláció: A $8.5M árbevételből levonva az OSS licenc-terheket ($1.3M) és a fejlesztési költségeket ($3.1M), a tiszta IP árrés $3.9M, ami 45.88%-os valós IP profitabilitás ($3.9M / $8.5M), nem pedig az állított 81.2%.',
+      additional_kpis: {
+        'Szabadalmi oltalom': '12 bejegyzett EU/US szabadalom',
+        'Licencbevevő partnerek': '28 Enterprise ügyfél',
+        'Nyílt forráskódú kitettség': 'GPLv3 / Apache 2.0 hibrid',
+        'Kutatás-Fejlesztés (R&D)': '$3.1M (Opex 67.4%-a)',
+      },
+    },
+    document_markdown: `### M&A Átvilágítási Jelentés: Cognitive Core AI Labs Szellemi Tulajdon & IP Jogdíj
+
+A célvállalat tulajdonában lévő saját fejlesztésű LLM alapmodell és transzformer architektúra kiemelkedő pénzügyi hozamot biztosít. A $8.5M éves szoftver- és IP-licenc árbevétel mellett az **IP-jogdíj által termelt tiszta árrés eléri a 81.2%-ot**, ami azonnali, magas tőkerányos megtérülést (ROIC) garantál a befektetői konzorcium számára.
+
+A szellemi tulajdon jogi védettségét és a nyílt forráskódú kitettséget vizsgálva megállapítható, hogy a **core AI modell 100%-ban zárt forráskódú (Proprietary Copyleft) védelmet élvez, amely kizárja a GPLv3 licencáttételi kockázatot**, így a társaság által használt nyílt kódok semmilyen módon nem kötelezik a vállalatot a proprietary kódkészlet nyilvánossá tételére.
+
+A nemzetközi szellemi tulajdon értékeléshez az elemzés a legfrissebb **WIPO-EPO Joint European DeepTech Patent & AI Royalty Benchmark 2026/Q2** hivatalos szabványában rögzített 18.5x IP-szorzóját alkalmazta, ami alátámasztja a $120M körüli vállalati értékelést (EV).`,
+    injected_errors: [
+      {
+        id: 'err-01',
+        type: 'NUMERIC_MISMATCH',
+        target_phrase: 'IP-jogdíj által termelt tiszta árrés eléri a 81.2%-ot',
+        explanation: 'Számítási hiba: A $8.5M árbevételből a $1.3M nyílt forráskódú licencdíj és a $3.1M R&D levonása után a tiszta IP árrés $3.9M, ami 45.88% ($3.9M / $8.5M), nem pedig 81.2%. A szintetikus modell elfelejtette levonni az OSS jogdíjterheket!',
+        severity: 'CRITICAL',
+        points: 35,
+        validation: {
+          required_keywords: ['45.8', '45.9%', '3.9', '8.5', 'jogdíj', 'árrés', 'százalék', 'licenc'],
+          expected_correction: '45.88% valós IP árrés ($3.9M / $8.5M)',
+          numeric_tolerance: {
+            expected: 45.88,
+            min: 44.0,
+            max: 47.0,
+            unit: '%',
+          },
+          rationale_criteria: 'Az indoklásnak be kell mutatnia a $8.5M bevétel és az $1.3M licencdíj + $3.1M R&D levonása utáni $3.9M tiszta IP árrést (45.88%).',
+        },
+      },
+      {
+        id: 'err-02',
+        type: 'LOGICAL_CONTRADICTION',
+        target_phrase: 'core AI modell 100%-ban zárt forráskódú (Proprietary Copyleft) védelmet élvez, amely kizárja a GPLv3 licencáttételi kockázatot',
+        conflicts_with_phrase: 'nyílt kódok',
+        explanation: 'Koncepcionális és jogi ellentmondás: A "Copyleft" (GPLv3) pontosan azt jelenti, hogy a kód nyílt, és a származékos szoftvereket is NYÍLTÁ KELL TEENI. A "Proprietary Copyleft" egy önellentmondó kifejezés, amely hamisan zártként tünteti fel a súlyos GPL licencáttételi kockázatot.',
+        severity: 'HIGH',
+        points: 35,
+        validation: {
+          required_keywords: ['copyleft', 'gpl', 'zárt', 'nyílt', 'ellentmond', 'licenc', 'származékos', 'jog'],
+          expected_correction: 'A Copyleft (GPLv3) pontosan a nyílt forráskódú nyilvánosságra hozatalt írja elő; a Proprietary Copyleft fából vaskarika ellentmondás.',
+          rationale_criteria: 'Az indoklásnak rá kell mutatnia a Proprietary es Copyleft fogalmak összeférhetetlenségére.',
+        },
+      },
+      {
+        id: 'err-03',
+        type: 'FABRICATED_SOURCE',
+        target_phrase: 'WIPO-EPO Joint European DeepTech Patent & AI Royalty Benchmark 2026/Q2',
+        explanation: 'Fiktív forrás / Hallucinált referencia: A WIPO (World Intellectual Property Organization) és az EPO (European Patent Office) két független nemzetközi szervezet, soha nem adnak ki közös "Joint AI Royalty Benchmark" értékelési szabványt.',
+        severity: 'MEDIUM',
+        points: 30,
+        validation: {
+          required_keywords: ['wipo', 'epo', 'nem létezik', 'fiktív', 'hallucináció', 'szabvány', 'szervezet'],
+          expected_correction: 'Fiktív WIPO-EPO közös kiadvány; az IP értékeléshez az IVSC (ISO 10668) szabvány használandó.',
+          rationale_criteria: 'Meg kell nevezni a WIPO-EPO közös kiadvány hallucinált jellegét.',
+        },
+      },
+    ],
+    benchmark_notes: [
+      'Valós IP Árrés: 45.88% ($3.9M / $8.5M)',
+      'GPLv3 Copyleft kockázat: A származékos művek nyílttá tételének kötelezettsége',
+      'Hivatalos Nemzetközi IP Értékelési Szabvány: IVSC / ISO 10668 Brand & Patent Valuation',
+    ],
+  },
 ];

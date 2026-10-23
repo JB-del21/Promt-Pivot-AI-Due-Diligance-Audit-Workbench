@@ -72,6 +72,24 @@ const LEGIT_BY_SCENARIO: Array<Array<{ just: string; corr: string }>> = [
       corr: 'Fiktív EBA jogszabályi hivatkozás; az EBA nem ad ki egyedi tőkementesítési direktívát.',
     },
   ],
+  // Scenario 3: Project GenAI IP DeepTech
+  [
+    // err-01 (NUMERIC: IP Royalty Margin)
+    {
+      just: 'A $8.5M árbevételből levonva az $1.3M nyílt forráskódú licencdíjat és a $3.1M R&D ráfordítást, a tiszta IP árrés $3.9M, ami 45.88% ($3.9M / $8.5M), nem pedig 81.2%.',
+      corr: '45.88% valós IP árrés ($3.9M / $8.5M)',
+    },
+    // err-02 (LOGICAL: Proprietary Copyleft)
+    {
+      just: 'A Copyleft (GPLv3) azt írja elő, hogy a kód nyílt, és a származékos műveket is nyílttá kell tenni. A Proprietary Copyleft fából vaskarika ellentmondás, ami elfedi a licencáttételi kockázatot.',
+      corr: 'A Copyleft (GPLv3) a forráskód nyílttá tételét kötelezi; a Proprietary Copyleft önellentmondás.',
+    },
+    // err-03 (FABRICATED: WIPO-EPO Joint Benchmark)
+    {
+      just: 'A WIPO és az EPO különálló nemzetközi szervezet, nem adnak ki közös Joint AI Royalty Benchmark értékelési szabványt; a hivatkozás fiktív hallucináció.',
+      corr: 'Fiktív WIPO-EPO közös kiadvány; az IP értékeléshez az IVSC (ISO 10668) szabvány használandó.',
+    },
+  ],
 ];
 
 function makeAnnotation(
@@ -362,6 +380,17 @@ test('full audit on Scenario 2 (E-Commerce Nordic) achieves 100/100 Senior ratin
 test('full audit on Scenario 3 (Fintech NovaPay) achieves 100/100 Senior rating', async () => {
   const sc = SCENARIOS[2];
   const anns = sc.injected_errors.map((e, idx) => makeAnnotation(e, LEGIT_BY_SCENARIO[2][idx].just, LEGIT_BY_SCENARIO[2][idx].corr, sc.scenario_id));
+  const res = await evaluateAudit(sc.injected_errors, anns, 240, sc.scenario_id);
+
+  assert.equal(res.totalScore, 100);
+  assert.equal(res.truePositivesCount, 3);
+  assert.equal(res.falsePositivesCount, 0);
+  assert.equal(res.auditorReliability, 'Senior szintű elemzői teljesítmény');
+});
+
+test('full audit on Scenario 4 (DeepTech GenAI IP) achieves 100/100 Senior rating', async () => {
+  const sc = SCENARIOS[3];
+  const anns = sc.injected_errors.map((e, idx) => makeAnnotation(e, LEGIT_BY_SCENARIO[3][idx].just, LEGIT_BY_SCENARIO[3][idx].corr, sc.scenario_id));
   const res = await evaluateAudit(sc.injected_errors, anns, 240, sc.scenario_id);
 
   assert.equal(res.totalScore, 100);
