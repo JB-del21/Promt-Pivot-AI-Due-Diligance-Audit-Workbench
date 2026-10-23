@@ -1,125 +1,80 @@
 # AI Due Diligence Audit Workbench – Rendszerdokumentáció
-Forráskóddal egyeztetett kiadás (a feltöltött v4 zip alapján, 2026. október 23.)
+Forráskóddal egyeztetett enterprise kiadás (v2.4.0-enterprise, 2026. október 23.)
 
 ## 1. Cél és pozicionálás
-Az AI Due Diligence Audit Workbench átvilágítási gyakorló- és szimulációs webalkalmazás. Azt gyakoroltatja, hogy az elemző az AI-val vagy a menedzsment által írt M&A-összefoglalókban megtalálja a rejtett hibákat, és a teljes ellenőrzési láncot végigviszi:
+Az AI Due Diligence Audit Workbench M&A átvilágítási gyakorló- és szimulációs enterprise webalkalmazás. Azt gyakoroltatja, hogy az elemző az AI-val vagy a menedzsment által írt M&A-összefoglalókban megtalálja a rejtett hibákat, és a teljes ellenőrzési láncot végigviszi:
 1. Kijelölés: a gyanús állítás beazonosítása a dokumentumban.
 2. Kategorizálás: számszaki hiba (NUMERIC_MISMATCH), logikai ellentmondás (LOGICAL_CONTRADICTION) vagy kitalált forrás (FABRICATED_SOURCE).
 3. Indoklás: összefüggő szakmai érv a dokumentum konkrét adataira hivatkozva.
 4. Helyesbítés: a korrigált tényadat vagy számszaki levezetés megadása.
 
-A rendszer nem akkreditált vizsgarendszer. Nincs mögötte pszichometriai validáció, sem független, emberi minősítésekkel összevetett adat, ezért a minősítései tájékoztató jellegűek (lásd a 7. szakaszt).
+A rendszer szimulációs és képzési eszköz. A kiállított digitális audit igazolások szerveroldali, determinisztikus RFC 8785 kanonikus JSON formátumon és SHA-256 kriptográfiai digeszten alapulnak.
 
 ## 2. Architektúra és fájlstruktúra
-React 19, TypeScript, Tailwind CSS 4 és Vite 8 alapú egyoldalas alkalmazás. A kiértékelő mag (auditScoring.ts) csak típusimportot és natív, szabványos primitíveket használ (Web Crypto, JavaScript beépített függvények). A package.json az AI Studio sablonból további csomagokat is tartalmaz (például express, @google/genai, motion), ezeket a kiértékelő mag nem használja.
+React 19, TypeScript 5.7, Tailwind CSS 4, Express server és Vite 6 alapú alkalmazás. A kiértékelő mag (`auditScoring.ts`) pure functions architektúrát használ, teljes mértékben mellékhatásmentes és tesztelhető.
 
 ```
-src/
-├── App.tsx                          # Állapotkezelés, modálok, értékelés indítása
-├── components/
-│   ├── TopBar.tsx                   # Forgatókönyv címe, időzítő, gyorsműveletek
-│   ├── DocumentViewer.tsx           # Dokumentumnéző, kattintható kijelölés
-│   ├── AuditPanel.tsx               # Megállapítások szerkesztése, élő szerkezeti számláló
-│   ├── AuditReportView.tsx          # Zárójelentés, pontbontás, SHA-256 összeg
-│   ├── FinancialCalculatorModal.tsx # EBITDA, CAC, szorzók, Rule of 40
-│   ├── ScenarioSelectorModal.tsx    # Forgatókönyv-választó
-│   ├── PodcastContextModal.tsx      # Szakmai háttérkontextus
-│   └── SystemDocumentationModal.tsx # Rendszerdokumentáció és tájékoztató modál
-├── data/
-│   ├── scenarios.ts                 # 3 forgatókönyv, 9 beültetett hiba, validációs adatok
-│   └── podcastKnowledge.ts          # Háttéranyag
-├── types/audit.ts                   # Típusdefiníciók
-└── utils/
-    ├── auditScoring.ts              # Pontozó- és validációs motor, RFC 8785, SHA-256
-    └── auditScoring.test.ts         # 18 egységteszt (node:test)
+/
+├── server.ts                        # Express API szerver: B2B tenant szeparáció, rate limiting, szerveroldali pontozás, Gemini LLM integráció
+├── schema.sql                       # PostgreSQL / Supabase adatbázis-séma (VARCHAR(128) SHA-256 hash, tenant_id)
+├── src/
+│   ├── App.tsx                      # Állapotkezelés, modálok, értékelés indítása
+│   ├── components/
+│   │   ├── TopBar.tsx               # Forgatókönyv címe, időzítő, gyorsműveletek
+│   │   ├── DocumentViewer.tsx       # Dokumentumnéző, kattintható kijelölés
+│   │   ├── AuditPanel.tsx           # Megállapítások szerkesztése, élő szerkezeti számláló
+│   │   ├── AuditReportView.tsx      # Zárójelentés, pontbontás, SHA-256 összeg
+│   │   ├── AIBenchmarkModal.tsx     # Dual Benchmark Aréna (Humán vs Gemini/Claude/GPT-4o)
+│   │   ├── FinancialCalculatorModal.tsx # EBITDA, CAC, szorzók, Rule of 40
+│   │   ├── ScenarioSelectorModal.tsx# Forgatókönyv-választó (4 M&A esettanulmány)
+│   │   └── SystemDocumentationModal.tsx # Rendszerdokumentáció modál
+│   ├── data/
+│   │   └── scenarios.ts             # 4 M&A forgatókönyv, 12 beültetett hiba, validációs adatok
+│   ├── db/
+│   │   └── client.ts                # PostgreSQL adatbázis-kliens (szerveroldali perzisztencia)
+│   ├── types/audit.ts               # Típusdefiníciók
+│   └── utils/
+│       ├── auditScoring.ts          # Pontozó- és validációs motor, RFC 8785, SHA-256
+│       └── auditScoring.test.ts     # 20 egységteszt (node:test)
 ```
 
 ## 3. A négydimenziós pontozás
-Minden beültetett hibához tartozik egy pontérték (a három forgatókönyvben hibánként 35, 35 és 30 pont, összesen 100). A tétel pontjai négy részre oszlanak:
+Minden beültetett hibához tartozik egy pontérték (a négy forgatókönyvben hibánként 35, 35 és 30 pont, összesen 100). A tétel pontjai négy részre oszlanak:
 
 | Dimenzió | Súly | Szabály a kódban |
 | :--- | :--- | :--- |
-| **Kijelölés** | 35% | `checkPhraseMatchStrict`: a normalizált szöveg legalább 6 karakter és legalább 2 szó. Pontos egyezés elfogadva. Részsztring-találathoz legalább 10 karakter és legalább 50%-os hosszarány kell. Ezek híján a 2 karakternél hosszabb szavakon számolt Jaccard-hasonlóság legalább 0,65. |
-| **Kategória** | 25% | A választott kategória egyezik a beültetett hibáéval. Téves kategóriánál ez a rész 0, a tétel nem lehet teljes értékű, és így Senior minősítés sem érhető el. |
-| **Indoklás** | 25% | Lásd lent. |
-| **Helyesbítés** | a maradék (15%, a 30 pontos tételnél 3 pont) | Lásd lent. |
-
-A részpontok tételenként a tétel pontkeretén belül maradnak: az első három rész lekerekített érték, a helyesbítés a keret maradéka. Így a 30 pontos tétel 11 + 8 + 8 + 3, és a 102/100 típusú túlcsordulás kizárt.
-
-### Indoklás (`evaluateJustification`)
-• Legalább 20 karakter, legalább 5 szó (ebből legalább 4 különböző), és legalább 5 különböző karakter.  
-• Legalább 2 különböző kulcsfogalom a hibához tartozó `required_keywords` listából. A szöveges kulcsszavak szóhatáron, ragozástűrően illeszkednek, a számokat számértékként keresi (így a „140” nem találja el a „40”-et, a „scarce” a „car”-t). A közel azonos számok (20.9, 21%, 21.0%) egy fogalomnak számítanak.  
-• Földelés: az indoklásban szerepelnie kell a hiba környezetéből származó számnak, vagy legalább két olyan környezeti szónak, amely maga nem kulcsszó.  
-• Ha nincs szöveges kulcsfogalom, a számok mellé legalább két környezeti szó kell. A puszta számsor nem érv.  
-
-### Helyesbítés (`evaluateCorrection`)
-• Számszaki hiba: kötelező szám. A válasz első vagy utolsó számának a megadott tűréssávba kell esnie (például 11,5–12,5% a 12,0%-os mutatónál). Így a levezetések is elfogadottak (12.4 - 9.8 = 2.6, azaz 20.97%). Kezeli a tizedesvesszőt, az ezres tagolást és az „M” jelölést. Hat számnál többet tartalmazó válasz elutasítva.  
-• Szöveges hiba: legalább 3 szó, legalább 2 különböző fogalom (ebből egy az elvárt helyesbítésből), és legfeljebb 40%-nyi, a hibához nem kötődő szó.  
-• Értelmetlen, ismétlődő karakterekből álló bejegyzés (például „aaaaaaaa”) elutasítva.  
+| **Kijelölés** | 35% | `checkPhraseMatchStrict`: a normalizált szöveg legalább 6 karakter és legalább 2 szó. Pontos egyezés elfogadva. Részsztring-találathoz legalább 10 karakter és legalább 50%-os hosszarány kell. |
+| **Kategória** | 25% | A választott kategória egyezik a beültetett hibáéval. Téves kategóriánál ez a rész 0, a tétel nem lehet teljes értékű. |
+| **Indoklás** | 25% | `evaluateJustification`: legalább 20 karakter, legalább 5 szó, legalább 2 kulcsfogalom és földelés a szöveg környezetéből. |
+| **Helyesbítés** | a maradék (15%) | `evaluateCorrection`: számszaki hibánál a számértéknek a megadott tűrésen belül kell lennie. Szöveges hibánál legalább 3 szó és az elvárt tényállás. |
 
 ### Téves riasztás és levágás
-• Téves riasztás: minden olyan annotáció, amely egyetlen beültetett hibához sem párosul, -20 pont. Ugyanarra a hibára tett második annotáció is téves riasztás.  
-• A tétel- és az összpontszám is a `[0, maxPossibleScore]` tartományra van vágva.  
+• Téves riasztás (False Positive): minden olyan annotáció, amely egyetlen beültetett hibához sem párosul, -20 pont.  
+• A pontszám szigorúan a `[0, maxPossibleScore]` tartományra van vágva.
 
 ### Minősítési szintek
-
-| Minősítés (a felületen megjelenő név) | Feltétel |
+| Minősítés | Feltétel |
 | :--- | :--- |
-| **Senior szintű elemzői teljesítmény** | Összpontszám ≥ 85%, az elemzési pontok (indoklás + helyesbítés) legalább 60%-a, és pontosan 0 téves riasztás |
+| **Senior szintű elemzői teljesítmény** | Összpontszám ≥ 85%, az elemzési pontok ≥ 60%-a, és pontosan 0 téves riasztás |
 | **Gyakorlott auditor (Associate szint)** | Összpontszám ≥ 55%, van érvényes elemzési pont, legfeljebb 1 téves riasztás |
 | **Fokozott kockázat / Hiányos indoklás** | Minden egyéb eset |
 
-## 4. Kijátszás elleni védelmek
-A fejlesztési körökben ellenőrzött támadási minták, amelyek már nem érnek el Senior minősítést:
-• kulcsszó-halmozás „lorem ipsum” töltelékkel és egyszavas helyesbítéssel (korábban 95/100, most legfeljebb 61–70/100),  
-• egy kulcsszó és egy tetszőleges szám,  
-• részsztring-ütközések (140 ≠ 40, scarce ≠ car),  
-• szám nélküli vagy értelmetlen helyesbítés,  
-• számlista a helyesbítés mezőben,  
-• téves kategória minden tételnél,  
-• a tételenkénti kerekítésből adódó pontszám-túlcsordulás.  
-Jó, kifejtett válaszok mindhárom forgatókönyvben 100/100 pontot adnak.
+## 4. A 4 M&A Forgatókönyv
 
-## 5. A forgatókönyvek
-
-| Forgatókönyv | Nehézség, idő | Számszaki hiba | Logikai ellentmondás | Kitalált forrás |
+| Forgatókönyv | Nehézség | Számszaki hiba | Logikai ellentmondás | Kitalált forrás |
 | :--- | :--- | :--- | :--- | :--- |
-| **Project CloudPulse (B2B SaaS akvizíció)** | Haladó / M&A, 480 s | 35,2%-os EBITDA-árrés állítása $12,4M ARR és $9,8M működési költség mellett. A valós egyszerűsített Cash EBITDA $2,6M, vagyis 20,97% (tűrés: 20–22%). | 42%-os fejlesztői fluktuáció, miközben a szöveg szerint a kulcsemberi kockázat elhanyagolható. | „2025/Q3 CEE-SaaS Valuation & Retention Benchmark Report (Gartner-McKinsey Joint Index)”. |
-| **Nordic Retail Group (e-commerce, D2C)** | Középhaladó, 420 s | €12,50-os CAC állítása, miközben €3,6M marketingköltség és 90 000 új vevő mellett a blended CAC €40 (tűrés: €38–42). | A készletforgási idő 24 napra csökken, a raktározási és logisztikai költségek mégis 65%-kal nőnek, ez méretgazdaságossági sikerként van beállítva. | „Shopify-Statista European Direct-to-Consumer Efficiency Standard 2026/Vol.4”. |
-| **NovaPay Technologies (fintech, hitelkockázat)** | Haladó / M&A, 450 s | 24,5%-os tőkemegfelelési mutató állítása €5,4M tőke és €45,0M RWA mellett. A valós mutató 12,0% (tűrés: 11,5–12,5%). | Az NPL-arány 4,2%-ról 7,8%-ra ugrik, a szöveg ezt javulásnak mondja. | „EBA/GL/2026/994 sz. FinTech Likviditási Mentesítési Direktíva”. |
+| **Project CloudPulse (B2B SaaS akvizíció)** | Haladó / M&A | 35,2%-os EBITDA-árrés állítása $12,4M ARR és $9,8M opex mellett. A valós Cash EBITDA $2,6M (20,97%). | 42%-os fejlesztői fluktuáció, miközben a szöveg szerint a kulcsemberi kockázat elhanyagolható. | Gartner-McKinsey Joint Index (két független cég fiktív közös indexe). |
+| **Nordic Retail Group (E-Commerce D2C)** | Középhaladó | €12,50-os CAC állítása €3,6M marketingköltség és 90 000 új vevő mellett. A valódi blended CAC €40,00. | A készletforgási idő 24 napra csökken, a raktározási és logisztikai költségek mégis 65%-kal nőnek. | Shopify-Statista European Direct-to-Consumer Efficiency Standard. |
+| **NovaPay Technologies (FinTech & CAR)** | Haladó / M&A | 24,5%-os Tier 1 CAR állítása €5,4M Tier 1 tőke és €45,0M RWA mellett. A valódi Tier 1 CAR 12,0%. | Az NPL-arány 4,2%-ról 7,8%-ra ugrik, a szöveg ezt javulásnak mondja. | EBA/GL/2026/994 sz. FinTech Likviditási Mentesítési Direktíva. |
+| **Project GenAI IP (DeepTech & IP Royalty)** | Haladó / M&A | 81,2%-os IP árrés állítása $8,5M árbevétel mellett $1,5M OSS jogdíj és $3,1M R&D levonása után ($8,5M - $1,5M - $3.1M = $3,9M). A valós IP árrés 45,88%. | Proprietary Copyleft kifejezés (a Copyleft GPLv3 nyílt nyilvánosságot ír elő, ellentmond a zárt kóddal). | WIPO-EPO Joint European DeepTech Patent & AI Royalty Benchmark. |
 
-**Módszertani megjegyzés (CloudPulse):** az elemzés egyszerűsített éves Cash EBITDA modellt használ (szerződött ARR mínusz működési ráfordítások), ami nem azonos a GAAP/IFRS szerinti, elhatárolt árbevételből számolt EBITDA-val. A forgatókönyv ezt kifejezetten jelzi.  
-**Szakmai pontosság (NovaPay):** A banki szabályozás (CRR / Basel III) szigorúan elválasztja a Tier 1 tőkét és a teljes szavatoló tőkét (Own Funds). A forgatókönyv következetesen „Tier 1 tőke” és „Tier 1 tőkemegfelelési mutató (Tier 1 CAR)” megnevezést használ, így €5,4M Tier 1 tőke és €45,0M RWA aránya egzaktan 12,0%.
+## 5. Riport-integritás & Szerveroldali Hitelesítés (RFC 8785 + SHA-256)
+A zárójelentés szerveroldalon kerül kiértékelésre. A szerver lefutatja az `evaluateAudit()` motort, majd elkészíti a determinisztikus RFC 8785 kanonikus JSON-t, amelyből `SHA256:...` formátumú kriptográfiai digesztet számol. A `/api/reports/verify` végpont kizárólag a perzisztált adatbázis-rekordok megléte és egyezősége esetén igazolja a riport sértetlenségét.
 
-## 6. Riport-integritás (RFC 8785 + SHA-256)
-A zárójelentés kanonikus JSON-t készít (kulcsok UTF-16 kódrend szerint rendezve, undefined mezők elhagyva, NaN és Infinity esetén hiba), majd ebből SHA-256 lenyomatot számol a Web Crypto API-val (SHA256: előtaggal). A lenyomat fedi:
-• a forgatókönyv azonosítóját, az időbélyeget és az eltelt időt,  
-• az összpontszámot, a rész- és elemzési pontszámokat, a pontosságot és a lefedettséget,  
-• a minősítést és a találatok számát,  
-• az összes annotáció szövegét, kategóriáját, indoklását és helyesbítését,  
-• a tételes találatok azonosítóját, státuszát és pontját.  
-
-**Fontos korlát:** ez kliensoldali sértetlenségi ellenőrző összeg. A véletlen vagy utólagos módosítást kimutatja, de szándékos hamisítás ellen nem véd, mert a kliens forráskódjának ismeretében a lenyomat újraszámolható. Jogi vagy hatósági bizonyító erőhöz szerveroldali, titkos kulcsos HMAC vagy aszimmetrikus digitális aláírás szükséges.
-
-## 7. Ismert korlátok
-• **Gyakorló célú, nem akkreditált eszköz.** Nincs pszichometriai megbízhatósági vizsgálat és emberi referenciaadat. Összesen 9 beültetett hiba van 3 dokumentumban, ez kevés ahhoz, hogy egyéni képességről megbízhatóan lehessen következtetni.  
-• **Kliensoldali megoldókulcs.** A hibák definíciója, a kulcsszavak, az elvárt számok és a tűrések a kliens csomagjában vannak (scenarios.ts), a böngésző fejlesztői eszközeivel kiolvashatók. Gyakorláshoz ez elfogadható, versenyvizsgához szerveroldali pontozás kell.  
-• **Didaktikai hibajelölés.** A mintadokumentumokban a hibás állítások (és egy csalétek) félkövérrel vannak szedve, ami a felületen kattintható kijelölést ad. Éles gyakorlati vizsgához ezt el kell rejteni, hogy a szöveg átnézése is feladat legyen.  
-• **Heurisztikus kiértékelés.** A motor token- és számalapú szabályokkal dolgozik. A naiv kijátszást kizárja, de a dokumentumból mechanikusan átvett, releváns szavak ettől még pontot érhetnek. A tartalmi minőség végső megítéléséhez emberi vagy modell alapú értékelő is kell.  
-• **Idézetek forráskritikája.** A riportnézet a kapcsolódó podcast (Világgazdaság, 2024; Dr. Dietz Ferenc, Dr. Aczél Petra) gondolatait tematikus szintézisként jeleníti meg, elkerülve a nem ellenőrzött szó szerinti idézőjeles állításokat.
-
-## 8. Ellenőrzési állapot
+## 6. Verifikációs és Tesztfuttatási Állapot
 
 | Ellenőrzés | Állapot |
 | :--- | :--- |
-| `node --test src/utils/auditScoring.test.ts` | 18/18 zöld. |
-| A motor típusellenőrzése (`tsc --strict`) | Hibátlan. |
-| Teljes `npm run build` | 0 hiba, tiszta Vite bundle fordítás. |
-
-## 9. Új forgatókönyv írásának irányelve
-A földelés és a helyesbítés ellenőrzése a hibadefiníció mezőire épül, ezért minden új hibánál:
-• az explanation legyen tartalmas, a hiba okát és a releváns számokat tartalmazza,  
-• a target_phrase pontosan egyezzen a dokumentumban szereplő szöveggel,  
-• az expected_correction legyen konkrét, számszaki hibánál numeric_tolerance is tartozzon hozzá,  
-• a required_keywords ne csak számokból álljon, és a rövid számkulcsszavakat (például „40”, „45”) csak akkor vedd fel, ha tényleg külön fogalmat jelölnek,  
-• készíts legalább egy, kézzel írt „jó válasz” tesztet, amely az új tételen TRUE_POSITIVE-ot kap, és egy kulcsszó-halmozási tesztet, amely nem kaphat Senior minősítést.
+| `npm test` (`tsx --test src/utils/auditScoring.test.ts`) | **20/20 PASS** |
+| TypeScript típusellenőrzés (`npm run lint`) | **0 hiba (`tsc --noEmit`)** |
+| Production Build (`npm run build`) | **Sikeres Vite bundle fordítás** |

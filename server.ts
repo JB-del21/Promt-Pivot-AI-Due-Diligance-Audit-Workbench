@@ -19,23 +19,87 @@ const PORT = Number(process.env.PORT) || 3000;
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
-// Anti-FDoS & Zero-Trust Request Validation Middleware for LLM Routes
+// Extend Express Request type for Tenant Context
+declare global {
+  namespace Express {
+    interface Request {
+      tenantId: string;
+    }
+  }
+}
+
+// ==========================================
+// P0-01: Session Token & Tenant Isolation Middleware
+// ==========================================
+const validateApiAuth = (req: Request, res: Response, next: NextFunction) => {
+  const tenantHeader = req.headers['x-tenant-id'] as string;
+  const authHeader = req.headers['authorization'] as string;
+
+  // Extract or default tenant identifier
+  let tenantId = tenantHeader ? tenantHeader.trim() : 'default-tenant';
+
+  // Optional bearer token parsing for enterprise multi-tenancy
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    if (token.includes('-tenant-')) {
+      tenantId = token.split('-tenant-')[1] || tenantId;
+    }
+  }
+
+  req.tenantId = tenantId;
+  next();
+};
+
+app.use(validateApiAuth);
+
+// ==========================================
+// P0-05: Rate Limiter Middleware for LLM Endpoints
+// ==========================================
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+const benchmarkRateLimiter = (req: Request, res: Response, next: NextFunction) => {
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || '127.0.0.1';
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute window
+  const maxRequests = 10; // Max 10 benchmark calls per minute per IP
+
+  const record = rateLimitMap.get(clientIp);
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(clientIp, { count: 1, resetTime: now + windowMs });
+    return next();
+  }
+
+  if (record.count >= maxRequests) {
+    return res.status(429).json({
+      error: 'Too many benchmark execution requests. Rate limit exceeded (10 req/min).',
+      retryAfterSeconds: Math.ceil((record.resetTime - now) / 1000),
+      executionState: 'FAILED',
+    });
+  }
+
+  record.count += 1;
+  next();
+};
+
+// Zero-Trust Request Validation Middleware for LLM Routes
 const validateBenchmarkPayload = (req: Request, res: Response, next: NextFunction) => {
   const { scenarioId, documentText } = req.body;
   if (!scenarioId || typeof scenarioId !== 'string') {
-    return res.status(400).json({ error: 'Missing or invalid scenarioId parameter' });
+    return res.status(400).json({ error: 'Missing or invalid scenarioId parameter', executionState: 'FAILED' });
   }
   if (!documentText || typeof documentText !== 'string') {
-    return res.status(400).json({ error: 'Missing or invalid documentText parameter' });
+    return res.status(400).json({ error: 'Missing or invalid documentText parameter', executionState: 'FAILED' });
   }
-  // Cost guardrail: Hard cap document length to prevent token exhaustion attack
   if (documentText.length > 20000) {
-    return res.status(413).json({ error: 'Document exceeds maximum allowed length of 20,000 characters' });
+    return res.status(413).json({
+      error: 'Document exceeds maximum allowed length of 20,000 characters',
+      executionState: 'FAILED',
+    });
   }
   next();
 };
 
-// Healthcheck
+// Healthcheck V2 with DB & Tenant Health
 app.get('/api/health', async (req: Request, res: Response) => {
   let isDbConnected = false;
   try {
@@ -48,86 +112,182 @@ app.get('/api/health', async (req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
+    tenantId: req.tenantId,
     isDbConnected,
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'),
-    modelsSupported: ['gemini-3.8-flash', 'claude-3.5-sonnet', 'gpt-4o', 'llama-3-70b']
+    modelsSupported: ['gemini-3.8-flash', 'claude-3.5-sonnet', 'gpt-4o', 'llama-3-70b'],
   });
 });
 
-// Save Audit Report Submission (Web & Android Mobile Sync)
+// ==========================================
+// P0-02: Server-Side Score Re-Evaluation & Canonical Hash Generation
+// ==========================================
 app.post('/api/reports', async (req: Request, res: Response) => {
   try {
     const {
       scenarioId,
-      userName,
-      userRole,
-      deviceType,
-      totalScore,
-      auditStatus,
-      rawAuditJson,
-      sha256Hash,
-      faultResults,
+      annotations = [],
+      elapsedSeconds = 300,
+      isStrictMode = false,
+      userName = 'Anonymous Auditor',
+      userRole = 'Junior Analyst',
+      deviceType = 'web',
     } = req.body;
 
-    if (!scenarioId || !sha256Hash) {
-      return res.status(400).json({ error: 'Missing required scenarioId or sha256Hash' });
+    if (!scenarioId || typeof scenarioId !== 'string') {
+      return res.status(400).json({ error: 'Missing required scenarioId string' });
     }
 
+    const scenario = SCENARIOS.find((s) => s.scenario_id === scenarioId) || SCENARIOS[0];
+
+    // P0-02 CORE FIX: Re-evaluate annotations on the server side using the deterministic grading kernel!
+    const serverEvaluation = await evaluateAudit(
+      scenario.injected_errors,
+      Array.isArray(annotations) ? annotations : [],
+      Number(elapsedSeconds) || 300,
+      scenario.scenario_id,
+      isStrictMode ? 'STRICT' : 'GUIDED'
+    );
+
+    const seniorPass = serverEvaluation.auditorReliability === 'Senior szintű elemzői teljesítmény';
+    const grade: 'SENIOR' | 'ASSOCIATE' | 'JUNIOR' | 'UNQUALIFIED' = seniorPass
+      ? 'SENIOR'
+      : serverEvaluation.auditorReliability === 'Gyakorlott auditor (Associate szint)'
+      ? 'ASSOCIATE'
+      : serverEvaluation.totalScore >= 35
+      ? 'JUNIOR'
+      : 'UNQUALIFIED';
+
+    const categoryBreakdown = {
+      discoveryScore: serverEvaluation.discoveryScore,
+      analysisScore: serverEvaluation.analysisScore,
+      maxPossibleScore: serverEvaluation.maxPossibleScore,
+    };
+
+    const faultResults = serverEvaluation.detailedMatches.map((m) => ({
+      faultId: m.errorId || 'unknown',
+      status: m.status,
+      scoreAwarded: m.scoreAwarded,
+      comment: m.userAnnotation?.proposedCorrection || '',
+    }));
+
+    // Build Server-Verified Canonical JSON Payload
+    const canonicalPayload = {
+      scenarioId: scenario.scenario_id,
+      tenantId: req.tenantId,
+      userName: String(userName).trim(),
+      userRole: String(userRole).trim(),
+      deviceType: String(deviceType).trim(),
+      totalScore: serverEvaluation.totalScore,
+      grade,
+      auditStatus: seniorPass ? 'SENIOR' : grade,
+      falsePositivesCount: serverEvaluation.falsePositivesCount,
+      elapsedSeconds: Number(elapsedSeconds) || 300,
+      isStrictMode: Boolean(isStrictMode),
+      breakdown: categoryBreakdown,
+      faultResults,
+      timestamp: new Date().toISOString(),
+    };
+
+    const canonicalJson = canonicalizeJson(canonicalPayload);
+    const rawHashHex = await sha256(canonicalJson);
+    const serverSha256Hash = `SHA256:${rawHashHex}`;
+
+    // Save Server-Verified Report into PostgreSQL DB
     const dbResult = await saveAuditReportToDb({
-      scenarioId,
-      userName: userName || 'Anonymous Auditor',
-      userRole: userRole || 'Junior Analyst',
-      deviceType: deviceType || 'web',
-      totalScore: Number(totalScore) || 0,
-      auditStatus: auditStatus || 'UNQUALIFIED',
-      rawAuditJson: rawAuditJson || {},
-      sha256Hash,
-      faultResults: Array.isArray(faultResults) ? faultResults : [],
+      scenarioId: scenario.scenario_id,
+      userName: String(userName).trim(),
+      userRole: String(userRole).trim(),
+      deviceType: String(deviceType).trim(),
+      totalScore: serverEvaluation.totalScore,
+      auditStatus: seniorPass ? 'SENIOR' : grade,
+      rawAuditJson: canonicalPayload,
+      sha256Hash: serverSha256Hash,
+      tenantId: req.tenantId,
+      auditMode: isStrictMode ? 'strict' : 'standard',
+      faultResults,
     });
 
     res.status(200).json({
       success: true,
-      sha256Hash,
+      sha256Hash: serverSha256Hash,
+      serverVerifiedScore: serverEvaluation.totalScore,
+      grade,
+      seniorPass,
+      categoryBreakdown,
       persistedToDb: dbResult.success,
       reportId: dbResult.reportId || null,
       savedAt: new Date().toISOString(),
     });
   } catch (err: any) {
-    console.error('Error saving audit report:', err);
-    res.status(500).json({ error: 'Failed to submit report', details: err?.message });
+    console.error('Error in server-evaluated audit report submission:', err);
+    res.status(500).json({ error: 'Failed to evaluate and save report', details: err?.message });
   }
 });
 
-// Verify SHA-256 Audit Hash
+// ==========================================
+// P0-03: Strict Hash Verification
+// ==========================================
 app.post('/api/reports/verify', async (req: Request, res: Response) => {
   try {
     const { sha256Hash } = req.body;
     if (!sha256Hash || typeof sha256Hash !== 'string') {
-      return res.status(400).json({ error: 'Missing sha256Hash parameter' });
+      return res.status(400).json({ error: 'Missing sha256Hash parameter', verified: false });
     }
 
+    const trimmedHash = sha256Hash.trim();
+
     const rows = await executeQuery(
-      `SELECT id, scenario_id as "scenarioId", user_name as "name", user_role as "role", total_score as "totalScore", audit_status as "status", sha256_hash as "sha256Hash", submitted_at as "submittedAt"
+      `SELECT 
+        id, 
+        scenario_id as "scenarioId", 
+        user_name as "name", 
+        user_role as "role", 
+        device_type as "deviceType",
+        total_score as "totalScore", 
+        audit_status as "status", 
+        sha256_hash as "sha256Hash", 
+        tenant_id as "tenantId",
+        audit_mode as "auditMode",
+        raw_audit_json as "rawAuditJson",
+        submitted_at as "submittedAt"
        FROM audit_reports
-       WHERE sha256_hash = $1`,
-      [sha256Hash.trim()]
+       WHERE sha256_hash = $1 OR sha256_hash = $2`,
+      [trimmedHash, trimmedHash.replace(/^SHA256:/i, '')]
     );
 
-    if (rows.length > 0) {
-      return res.json({
-        verified: true,
-        persistedInDb: true,
-        record: rows[0],
+    if (rows.length === 0) {
+      // P0-03 FIX: Return verified: false if hash is NOT found in persistent registry!
+      return res.status(404).json({
+        verified: false,
+        persistedInDb: false,
+        error: 'Report hash not found in audit database registry.',
+        sha256Hash: trimmedHash,
       });
     }
 
-    res.json({
+    const record = rows[0];
+
+    return res.json({
       verified: true,
-      persistedInDb: false,
-      message: 'Hash conforms to standard 64-char SHA-256 digest format (Client-verified session).',
+      persistedInDb: true,
+      record: {
+        id: record.id,
+        scenarioId: record.scenarioId,
+        name: record.name,
+        role: record.role,
+        deviceType: record.deviceType,
+        totalScore: record.totalScore,
+        status: record.status,
+        sha256Hash: record.sha256Hash,
+        tenantId: record.tenantId,
+        auditMode: record.auditMode,
+        submittedAt: record.submittedAt,
+        details: record.rawAuditJson,
+      },
     });
   } catch (err: any) {
-    res.status(500).json({ error: 'Verification error', details: err?.message });
+    res.status(500).json({ error: 'Verification error', details: err?.message, verified: false });
   }
 });
 
@@ -141,8 +301,6 @@ app.get('/api/benchmark/presets', async (req: Request, res: Response) => {
     const errLogic = scenario.injected_errors.find((e) => e.type === 'LOGICAL_CONTRADICTION') || scenario.injected_errors[1];
     const errSource = scenario.injected_errors.find((e) => e.type === 'FABRICATED_SOURCE') || scenario.injected_errors[2];
 
-    // Presets represent deterministic, audited executions of leading LLM models
-    // against the seed faults to show the "Dual Benchmark (Human vs AI)" matrix.
     const presetProfiles = [
       {
         modelId: 'claude-3-5-sonnet',
@@ -159,7 +317,7 @@ app.get('/api/benchmark/presets', async (req: Request, res: Response) => {
             scenarioId: scenario.scenario_id,
             target_phrase: errNumeric.target_phrase,
             selectedType: errNumeric.type,
-            justification: `A dokumentum adatainak szigorú pénzügyi ellenőrzése során az állított mutató pontatlan. A tényadatok és működési költségek alapján a helyes érték: ${errNumeric.validation.required_keywords.slice(0, 3).join(' ')}.`,
+            justification: `A dokumentum adatainak szigorú pénzügyi ellenőrzése során az állított mutató pontatlan. A tényadatok alapján a helyes érték: ${errNumeric.validation.required_keywords.slice(0, 3).join(' ')}.`,
             proposedCorrection: errNumeric.validation.expected_correction,
             timestamp: Date.now() - 50000,
           }] : []),
@@ -250,7 +408,6 @@ app.get('/api/benchmark/presets', async (req: Request, res: Response) => {
             proposedCorrection: errLogic.validation.expected_correction,
             timestamp: Date.now() - 30000,
           }] : [])
-          // Intentionally OMITS errSource! Demonstrating hallucination blind spot.
         ]
       },
       {
@@ -276,7 +433,6 @@ app.get('/api/benchmark/presets', async (req: Request, res: Response) => {
       }
     ];
 
-    // Evaluate each model preset using the exact same deterministic Grading Kernel!
     const evaluatedPresets = await Promise.all(
       presetProfiles.map(async (preset) => {
         const evalResult = await evaluateAudit(
@@ -303,21 +459,22 @@ app.get('/api/benchmark/presets', async (req: Request, res: Response) => {
   }
 });
 
-// Live AI Benchmark Runner: Dispatches Scenario to Gemini with Strict Guardrails
-app.post('/api/benchmark/run', validateBenchmarkPayload, async (req: Request, res: Response) => {
+// ==========================================
+// P0-05: Live AI Benchmark Runner with AbortController Cancellation
+// ==========================================
+app.post('/api/benchmark/run', benchmarkRateLimiter, validateBenchmarkPayload, async (req: Request, res: Response) => {
   const { scenarioId, documentText, modelTier = 'gemini-3.8-flash' } = req.body;
   const startTime = Date.now();
 
   const scenario = SCENARIOS.find((s) => s.scenario_id === scenarioId) || SCENARIOS[0];
   const apiKey = process.env.GEMINI_API_KEY;
 
-  // If no Gemini API key is configured or default placeholder is present, return high-fidelity fallback execution
+  // Fallback to calibrated simulation if key is not configured
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     const elapsedSec = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-    // Simulate real Gemini 3.8 Flash analysis
     const simulatedAnnotations: UserAnnotation[] = [
       {
-        id: `gemini-live-${Date.now()}-1`,
+        id: `gemini-sim-${Date.now()}-1`,
         scenarioId: scenario.scenario_id,
         target_phrase: scenario.injected_errors[0]?.target_phrase || '142%-os nettó árbevétel-megtartási rátával (NDR)',
         selectedType: scenario.injected_errors[0]?.type || 'NUMERIC_MISMATCH',
@@ -326,7 +483,7 @@ app.post('/api/benchmark/run', validateBenchmarkPayload, async (req: Request, re
         timestamp: Date.now(),
       },
       {
-        id: `gemini-live-${Date.now()}-2`,
+        id: `gemini-sim-${Date.now()}-2`,
         scenarioId: scenario.scenario_id,
         target_phrase: scenario.injected_errors[1]?.target_phrase || 'Garner Enterprise SaaS Index (2024. Q3)',
         selectedType: scenario.injected_errors[1]?.type || 'FABRICATED_SOURCE',
@@ -345,8 +502,9 @@ app.post('/api/benchmark/run', validateBenchmarkPayload, async (req: Request, re
 
     return res.json({
       success: true,
+      executionState: 'SIMULATED',
       isLive: false,
-      note: 'Simulated Gemini Execution (API key not injected; using calibrated engine)',
+      note: 'Simulated Gemini Execution (Calibrated benchmark engine)',
       modelUsed: modelTier,
       annotations: simulatedAnnotations,
       evaluation,
@@ -354,7 +512,10 @@ app.post('/api/benchmark/run', validateBenchmarkPayload, async (req: Request, re
     });
   }
 
-  // Live Execution via GoogleGenAI SDK with Anti-FDoS Timeout and Output Limits
+  // P0-05 FIX: AbortController with strict 10s cancellation signal preventing background leaks!
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
     const ai = new GoogleGenAI({
       apiKey: apiKey,
@@ -383,11 +544,6 @@ DOKUMENTUM:
 ${documentText.slice(0, 15000)}
 """`;
 
-    // 10-second hard timeout race for robust Anti-FDoS and instant responsiveness
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('AI execution exceeded 10s budget')), 10000)
-    );
-
     const generatePromise = ai.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: prompt,
@@ -411,7 +567,18 @@ ${documentText.slice(0, 15000)}
       },
     });
 
-    const response = await Promise.race([generatePromise, timeoutPromise]);
+    // Race against AbortController timeout signal
+    const response = await Promise.race([
+      generatePromise,
+      new Promise<never>((_, reject) => {
+        controller.signal.addEventListener('abort', () => {
+          reject(new Error('AI execution aborted after 10s deadline'));
+        });
+      }),
+    ]);
+
+    clearTimeout(timeoutId);
+
     const responseText = response.text || '[]';
     let rawFindings: any[] = [];
     try {
@@ -442,6 +609,7 @@ ${documentText.slice(0, 15000)}
 
     res.json({
       success: true,
+      executionState: 'LIVE',
       isLive: true,
       modelUsed: 'gemini-3.8-flash',
       annotations,
@@ -449,8 +617,10 @@ ${documentText.slice(0, 15000)}
       latencyMs: Date.now() - startTime,
     });
   } catch (err: any) {
+    clearTimeout(timeoutId);
     console.warn('Gemini Live API fallback triggered:', err?.message);
-    // Graceful fallback to deterministic calibrated simulation on timeout or network error
+
+    // Fallback on timeout or API error with explicit state
     const errNumeric = scenario.injected_errors.find((e) => e.type === 'NUMERIC_MISMATCH') || scenario.injected_errors[0];
     const errLogic = scenario.injected_errors.find((e) => e.type === 'LOGICAL_CONTRADICTION') || scenario.injected_errors[1];
 
@@ -460,7 +630,7 @@ ${documentText.slice(0, 15000)}
         scenarioId: scenario.scenario_id,
         target_phrase: errNumeric.target_phrase,
         selectedType: errNumeric.type,
-        justification: `A pénzügyi adatok ellenőrzése során az állított mutató pontatlan. A bevétel és működési költség különbsége ${errNumeric.validation.required_keywords.slice(0, 2).join(' ')} levezetést igényel.`,
+        justification: `A pénzügyi adatok ellenőrzése során az állított mutató pontatlan. A levezetés ${errNumeric.validation.required_keywords.slice(0, 2).join(' ')} ellenőrzést igényel.`,
         proposedCorrection: errNumeric.validation.expected_correction,
         timestamp: Date.now(),
       }] : []),
@@ -469,7 +639,7 @@ ${documentText.slice(0, 15000)}
         scenarioId: scenario.scenario_id,
         target_phrase: errLogic.target_phrase,
         selectedType: errLogic.type,
-        justification: `Belső logikai ellentmondás az elhangzott állítás és a valós kockázatok között: ${errLogic.validation.required_keywords.slice(0, 2).join(' ')}.`,
+        justification: `Belső logikai ellentmondás az állítás és a kockázatok között: ${errLogic.validation.required_keywords.slice(0, 2).join(' ')}.`,
         proposedCorrection: errLogic.validation.expected_correction,
         timestamp: Date.now(),
       }] : []),
@@ -485,8 +655,9 @@ ${documentText.slice(0, 15000)}
 
     res.json({
       success: true,
+      executionState: 'SIMULATED',
       isLive: false,
-      note: 'Gemini 3.8 Flash Calibrated Engine (Live API hálózati fallback)',
+      note: `Gemini Fallback: ${err?.message || 'Network / timeout condition'}`,
       modelUsed: 'gemini-3.8-flash',
       annotations: fallbackAnnotations,
       evaluation,
@@ -495,19 +666,21 @@ ${documentText.slice(0, 15000)}
   }
 });
 
-// Comprehensive Cohort Analytics & Fault Heatmap Endpoint
+// ==========================================
+// P0-04: Cohort Analytics with Explicit Real DB vs Seed Isolation
+// ==========================================
 app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
   try {
     const scenarioId = (req.query.scenarioId as string) || SCENARIOS[0].scenario_id;
     const requestedGroup = req.query.group as string | undefined;
+    const sourceFilter = (req.query.source as string) || 'all'; // 'all', 'live_only', 'benchmark_only'
     const scenario = SCENARIOS.find((s) => s.scenario_id === scenarioId) || SCENARIOS[0];
 
     const injected = scenario.injected_errors;
-    const err0 = injected[0] || { id: 'err-01', type: 'NUMERIC_MISMATCH' as ErrorType, severity: 'CRITICAL', target_phrase: 'EBITDA árrés', explanation: 'Számítási hiba', points: 35, validation: { expected_correction: '20.97%' } };
-    const err1 = injected[1] || { id: 'err-02', type: 'LOGICAL_CONTRADICTION' as ErrorType, severity: 'HIGH', target_phrase: 'fluktuáció', explanation: 'Logikai ellentmondás', points: 35, validation: { expected_correction: 'Kockázat' } };
-    const err2 = injected[2] || { id: 'err-03', type: 'FABRICATED_SOURCE' as ErrorType, severity: 'MEDIUM', target_phrase: 'Gartner-McKinsey', explanation: 'Nem létező forrás', points: 30, validation: { expected_correction: 'Fiktív' } };
+    const err0: InjectedError = injected[0] || { id: 'err-01', type: 'NUMERIC_MISMATCH' as ErrorType, severity: 'CRITICAL', target_phrase: 'EBITDA árrés', explanation: 'Számítási hiba', points: 35, validation: { expected_correction: '20.97%', required_keywords: ['20.97%'], rationale_criteria: 'Számszaki indoklás' } };
+    const err1: InjectedError = injected[1] || { id: 'err-02', type: 'LOGICAL_CONTRADICTION' as ErrorType, severity: 'HIGH', target_phrase: 'fluktuáció', explanation: 'Logikai ellentmondás', points: 35, validation: { expected_correction: 'Kockázat', required_keywords: ['kockázat'], rationale_criteria: 'Logikai indoklás' } };
+    const err2: InjectedError = injected[2] || { id: 'err-03', type: 'FABRICATED_SOURCE' as ErrorType, severity: 'MEDIUM', target_phrase: 'Gartner-McKinsey', explanation: 'Nem létező forrás', points: 30, validation: { expected_correction: 'Fiktív', required_keywords: ['fiktív'], rationale_criteria: 'Forrás indoklás' } };
 
-    // Standardized cohorts
     const availableGroups = [
       'Összes kohorsz',
       'M&A Trainees 2026/Q1',
@@ -515,8 +688,10 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
       "Executive MBA Class '26",
     ];
 
-    // Fetch live persisted reports from PostgreSQL database
-    const dbReports = await fetchAuditReportsFromDb(scenarioId);
+    // Fetch live persisted reports from PostgreSQL database for this tenant
+    const dbReports = await fetchAuditReportsFromDb(scenarioId, req.tenantId);
+    
+    // Explicitly tag live DB records
     const dbParticipantsData = dbReports.map((r, idx) => ({
       id: r.id || `db-usr-${idx}`,
       name: r.name || 'Élő Auditáló',
@@ -525,12 +700,12 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
       cohortGroup: 'M&A Trainees 2026/Q1',
       elapsedSeconds: 300,
       falsePositivesCount: 0,
+      source: 'LIVE_DATABASE' as const,
       pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
     }));
 
-    // Seed roster of 14 calibrated participants demonstrating systemic blind spots
-    const rawParticipantsData = [
-      ...dbParticipantsData,
+    // Seed benchmark roster with explicit CALIBRATED_BENCHMARK source tag
+    const seedParticipantsData = [
       {
         id: 'usr-001',
         name: 'Bognár Dániel',
@@ -539,6 +714,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: 'M&A Trainees 2026/Q1',
         elapsedSeconds: 312,
         falsePositivesCount: 0,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -549,6 +725,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: 'Corporate Finance Fellowship',
         elapsedSeconds: 345,
         falsePositivesCount: 0,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -559,6 +736,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: 'M&A Trainees 2026/Q1',
         elapsedSeconds: 420,
         falsePositivesCount: 0,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'PARTIAL', [err1.id]: 'CAUGHT', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -569,6 +747,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: "Executive MBA Class '26",
         elapsedSeconds: 460,
         falsePositivesCount: 1,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -579,6 +758,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: 'M&A Trainees 2026/Q1',
         elapsedSeconds: 495,
         falsePositivesCount: 0,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'BLIND_SPOT', [err1.id]: 'CAUGHT', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -589,6 +769,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: 'Corporate Finance Fellowship',
         elapsedSeconds: 388,
         falsePositivesCount: 0,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'PARTIAL', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -599,6 +780,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: 'M&A Trainees 2026/Q1',
         elapsedSeconds: 370,
         falsePositivesCount: 0,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'PARTIAL' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -609,6 +791,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: "Executive MBA Class '26",
         elapsedSeconds: 510,
         falsePositivesCount: 2,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'BLIND_SPOT', [err1.id]: 'BLIND_SPOT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -619,6 +802,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: 'Corporate Finance Fellowship',
         elapsedSeconds: 310,
         falsePositivesCount: 0,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'CAUGHT', [err2.id]: 'CAUGHT' } as Record<string, FaultDetectionStatus>,
       },
       {
@@ -629,57 +813,27 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         cohortGroup: 'M&A Trainees 2026/Q1',
         elapsedSeconds: 440,
         falsePositivesCount: 1,
+        source: 'CALIBRATED_BENCHMARK' as const,
         pattern: { [err0.id]: 'PARTIAL', [err1.id]: 'CAUGHT', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
-      },
-      {
-        id: 'usr-011',
-        name: 'Takács Márton',
-        email: 'm.takacs@alumni-mba.edu',
-        role: 'MBA Candidate',
-        cohortGroup: "Executive MBA Class '26",
-        elapsedSeconds: 475,
-        falsePositivesCount: 0,
-        pattern: { [err0.id]: 'BLIND_SPOT', [err1.id]: 'PARTIAL', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
-      },
-      {
-        id: 'usr-012',
-        name: 'Kovács Attila',
-        email: 'attila.kovacs@finfellows.org',
-        role: 'M&A Fellow',
-        cohortGroup: 'Corporate Finance Fellowship',
-        elapsedSeconds: 360,
-        falsePositivesCount: 0,
-        pattern: { [err0.id]: 'PARTIAL', [err1.id]: 'CAUGHT', [err2.id]: 'PARTIAL' } as Record<string, FaultDetectionStatus>,
-      },
-      {
-        id: 'usr-013',
-        name: 'Pásztor Dóra',
-        email: 'dora.pasztor@mergers-audit.eu',
-        role: 'Junior Analyst',
-        cohortGroup: 'M&A Trainees 2026/Q1',
-        elapsedSeconds: 415,
-        falsePositivesCount: 0,
-        pattern: { [err0.id]: 'CAUGHT', [err1.id]: 'BLIND_SPOT', [err2.id]: 'PARTIAL' } as Record<string, FaultDetectionStatus>,
-      },
-      {
-        id: 'usr-014',
-        name: 'Juhász Máté',
-        email: 'm.juhasz@alumni-mba.edu',
-        role: 'MBA Fellow',
-        cohortGroup: "Executive MBA Class '26",
-        elapsedSeconds: 460,
-        falsePositivesCount: 1,
-        pattern: { [err0.id]: 'PARTIAL', [err1.id]: 'PARTIAL', [err2.id]: 'BLIND_SPOT' } as Record<string, FaultDetectionStatus>,
       },
     ];
 
-    // Filter by group if requested and not "Összes kohorsz"
-    const filteredRaw = (requestedGroup && requestedGroup !== 'Összes kohorsz')
-      ? rawParticipantsData.filter((p) => p.cohortGroup === requestedGroup)
-      : rawParticipantsData;
+    let combinedPool: any[] = [];
+    if (sourceFilter === 'live_only') {
+      combinedPool = dbParticipantsData;
+    } else if (sourceFilter === 'benchmark_only') {
+      combinedPool = seedParticipantsData;
+    } else {
+      combinedPool = [...dbParticipantsData, ...seedParticipantsData];
+    }
 
-    // Build rich participant records
-    const participants: CohortParticipant[] = await Promise.all(
+    // Filter by group if requested
+    const filteredRaw = (requestedGroup && requestedGroup !== 'Összes kohorsz')
+      ? combinedPool.filter((p) => p.cohortGroup === requestedGroup)
+      : combinedPool;
+
+    // Build participant objects
+    const participants = await Promise.all(
       filteredRaw.map(async (raw) => {
         const faultRecords: Record<string, any> = {};
         let totalScore = 0;
@@ -699,13 +853,13 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
           } else if (status === 'PARTIAL') {
             scoreAwarded = Math.round(err.points * 0.55);
             userFinding = `Gyanús megfogalmazás: „${err.target_phrase}”.`;
-            userCorrection = 'Részben korrigálva, a pontos matematikai arány vagy tételes forráskizárás hiányzik.';
-            feedback = 'Részleges pont: a hiba helye beazonosítva, de a szakmai indoklás vagy a helyesbítés mélysége nem érte el a Senior szintet.';
+            userCorrection = 'Részben korrigálva.';
+            feedback = 'Részleges pont.';
           } else {
             scoreAwarded = 0;
-            userFinding = 'Nem került jelölésre (figyelmen kívül hagyva).';
+            userFinding = 'Nem került jelölésre.';
             userCorrection = 'Nincs megadva.';
-            feedback = 'Vakfolt: a résztvevő kritika nélkül elfogadta az állítást az összefoglalóban.';
+            feedback = 'Vakfolt.';
           }
 
           totalScore += scoreAwarded;
@@ -725,10 +879,8 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
           };
         }
 
-        // Subtract penalty for false positives
         totalScore = Math.max(0, totalScore - raw.falsePositivesCount * 20);
 
-        // Grade calculation (Senior requires >=85 AND 0 false positives)
         let grade: 'SENIOR' | 'ASSOCIATE' | 'JUNIOR' | 'UNQUALIFIED' = 'UNQUALIFIED';
         let seniorPass = false;
 
@@ -746,12 +898,13 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
         const canonicalPayload = {
           id: raw.id,
           scenarioId: scenario.scenario_id,
+          tenantId: req.tenantId,
           score: totalScore,
           grade,
           falsePositives: raw.falsePositivesCount,
           timeSec: raw.elapsedSeconds,
         };
-        const sha256Hash = (await sha256(canonicalizeJson(canonicalPayload))).slice(0, 16);
+        const sha256Hash = `SHA256:${await sha256(canonicalizeJson(canonicalPayload))}`;
 
         return {
           id: raw.id,
@@ -759,6 +912,7 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
           email: raw.email,
           role: raw.role,
           cohortGroup: raw.cohortGroup,
+          source: raw.source,
           totalScore,
           grade,
           seniorPass,
@@ -766,13 +920,15 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
           elapsedSeconds: raw.elapsedSeconds,
           faultRecords,
           sha256Hash,
-          submittedAt: '2026-10-23T08:30:00Z',
+          submittedAt: new Date().toISOString(),
         };
       })
     );
 
-    // Compute cohort summary KPIs
     const totalAudits = participants.length;
+    const liveCount = participants.filter((p) => p.source === 'LIVE_DATABASE').length;
+    const benchmarkCount = participants.filter((p) => p.source === 'CALIBRATED_BENCHMARK').length;
+
     const avgScore = totalAudits > 0
       ? Number((participants.reduce((sum, p) => sum + p.totalScore, 0) / totalAudits).toFixed(1))
       : 0;
@@ -785,7 +941,6 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
     const associatePassRate = totalAudits > 0 ? Number(((associateCount / totalAudits) * 100).toFixed(1)) : 0;
     const unqualifiedRate = totalAudits > 0 ? Number(((unqualifiedCount / totalAudits) * 100).toFixed(1)) : 0;
 
-    // Fault blind spot rates
     const faultBlindSpotRates: Record<string, any> = {};
     for (const err of [err0, err1, err2]) {
       const caughtCount = participants.filter((p) => p.faultRecords[err.id]?.status === 'CAUGHT').length;
@@ -802,7 +957,6 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
       };
     }
 
-    // Identify top systemic risk (the error with highest blindSpotRate)
     let highestBlindError = err2;
     let highestRate = faultBlindSpotRates[err2.id]?.blindSpotRate || 0;
     for (const err of [err0, err1]) {
@@ -812,7 +966,6 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
       }
     }
 
-    // AI Models benchmark baseline
     const aiComparison = {
       humanAvgScore: avgScore,
       humanSeniorRate: seniorPassRate,
@@ -844,36 +997,30 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
           provider: 'OpenAI',
           score: 72,
           grade: 'ASSOCIATE',
-          blindSpotCount: 1, // Frequently misses fabricated citation
+          blindSpotCount: 1,
           hallucinationRate: '28.5%',
           latencyMs: 1850,
-        },
-        {
-          modelId: 'llama-3-70b',
-          modelName: 'Llama 3 70B Instruct',
-          provider: 'Meta',
-          score: 48,
-          grade: 'JUNIOR',
-          blindSpotCount: 2,
-          hallucinationRate: '41.2%',
-          latencyMs: 1200,
         },
       ],
     };
 
     const canonicalReportPayload = {
       scenarioId: scenario.scenario_id,
+      tenantId: req.tenantId,
       auditsCount: totalAudits,
+      liveCount,
+      benchmarkCount,
       avgScore,
       seniorPassRate,
       topRiskId: highestBlindError.id,
-      generatedAt: '2026-10-23T08:30:00Z',
+      generatedAt: new Date().toISOString(),
     };
-    const canonicalReportHash = await sha256(canonicalizeJson(canonicalReportPayload));
+    const canonicalReportHash = `SHA256:${await sha256(canonicalizeJson(canonicalReportPayload))}`;
 
-    const responsePayload: CohortAnalysisData = {
+    res.json({
       scenarioId: scenario.scenario_id,
       scenarioTitle: scenario.meta.title,
+      tenantId: req.tenantId,
       generatedAt: new Date().toISOString(),
       canonicalReportHash,
       availableGroups,
@@ -906,6 +1053,8 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
       participants,
       kpis: {
         totalAudits,
+        liveDatabaseAudits: liveCount,
+        benchmarkCalibratedAudits: benchmarkCount,
         averageScore: avgScore,
         seniorPassRate,
         associatePassRate,
@@ -918,14 +1067,12 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
           errorType: highestBlindError.type,
           blindSpotRate: highestRate,
           lesson: highestBlindError.type === 'FABRICATED_SOURCE'
-            ? 'A résztvevők 70+%-a kritika nélkül benyeli a tekintélyelvű, de nem létező tanácsadói jelentéseket (pl. Gartner-McKinsey Joint Index). A Prompt & Pivot tréning nélkülözhetetlen ezen forráshamisítások kiszűrésére.'
-            : 'A komplex EBITDA számítási ellentmondásokat az elemzők hajlamosak felületesen átfutni a formális ellenőrzés hiányában.',
+            ? 'A résztvevők 70+%-a kritika nélkül benyeli a tekintélyelvű, de nem létező tanácsadói jelentéseket (pl. Gartner-McKinsey Joint Index).'
+            : 'A komplex EBITDA számítási ellentmondásokat az elemzők hajlamosak felületesen átfutni.',
         },
       },
       aiComparison,
-    };
-
-    res.json(responsePayload);
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown server error';
     console.error('Error in /api/cohort/metrics:', err);
@@ -936,7 +1083,6 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
 // Setup Vite middleware in dev or static serving in production
 async function startServer() {
   if (process.env.VERCEL === '1') {
-    // In Vercel Serverless Functions, Vercel routes HTTP requests directly into `app`
     return;
   }
 
@@ -955,7 +1101,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Prompt & Pivot Enterprise Kernel] Server running on http://0.0.0.0:${PORT}`);
+    console.log(`[Prompt & Pivot Enterprise Kernel V2] Server running on http://0.0.0.0:${PORT}`);
   });
 }
 

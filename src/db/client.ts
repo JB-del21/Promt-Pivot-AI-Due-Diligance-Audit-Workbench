@@ -18,7 +18,7 @@ if (connectionString) {
     pool = new Pool({
       connectionString,
       ssl: process.env.NODE_ENV === 'production' || connectionString.includes('supabase') || connectionString.includes('neon')
-        ? { rejectUnauthorized: false }
+        ? { rejectUnauthorized: process.env.DB_REJECT_UNAUTHORIZED === 'true' }
         : false,
       max: 10,
       idleTimeoutMillis: 30000,
@@ -29,12 +29,12 @@ if (connectionString) {
     pool = null;
   }
 } else {
-  console.log('[PostgreSQL Client] No DATABASE_URL found. Running in stateless in-memory fallback mode.');
+  console.log('[PostgreSQL Client] No DATABASE_URL found. Running in stateless fallback mode.');
 }
 
 /**
  * Execute a SQL query on PostgreSQL with automatic parameter binding.
- * Returns empty array if database connection is not configured or fails.
+ * Throws on database failure so caller can detect and handle errors.
  */
 export async function executeQuery<T = any>(text: string, params?: any[]): Promise<T[]> {
   if (!pool) return [];
@@ -43,16 +43,14 @@ export async function executeQuery<T = any>(text: string, params?: any[]): Promi
     client = await pool.connect();
     const res = await client.query(text, params);
     return res.rows as T[];
-  } catch (error) {
-    console.error('[PostgreSQL Error]:', error);
-    return [];
   } finally {
     if (client) client.release();
   }
 }
 
 /**
- * Save an audit report submission into Supabase / PostgreSQL tables
+ * Save an audit report submission atomically into Supabase / PostgreSQL tables
+ * using a single ACID transaction.
  */
 export async function saveAuditReportToDb(payload: {
   scenarioId: string;
@@ -63,23 +61,30 @@ export async function saveAuditReportToDb(payload: {
   auditStatus: string;
   rawAuditJson: any;
   sha256Hash: string;
+  tenantId?: string;
+  auditMode?: string;
   faultResults?: Array<{ faultId: string; status: string; comment?: string }>;
 }): Promise<{ success: boolean; reportId?: string; error?: string }> {
-  if (!pool) return { success: false, error: 'Database connection not initialized' };
+  if (!pool) return { success: false, error: 'Database connection pool not initialized' };
 
+  let client: pg.PoolClient | null = null;
   try {
+    client = await pool.connect();
+    await client.query('BEGIN');
+
     const reportInsertQuery = `
       INSERT INTO audit_reports (
-        scenario_id, user_name, user_role, device_type, total_score, audit_status, raw_audit_json, sha256_hash
+        scenario_id, user_name, user_role, device_type, total_score, audit_status, raw_audit_json, sha256_hash, tenant_id, audit_mode
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       ON CONFLICT (sha256_hash) DO UPDATE SET
         total_score = EXCLUDED.total_score,
-        audit_status = EXCLUDED.audit_status
+        audit_status = EXCLUDED.audit_status,
+        tenant_id = EXCLUDED.tenant_id
       RETURNING id;
     `;
 
-    const rows = await executeQuery<{ id: string }>(reportInsertQuery, [
+    const reportRes = await client.query<{ id: string }>(reportInsertQuery, [
       payload.scenarioId,
       payload.userName || 'Anonymous Auditor',
       payload.userRole || 'Junior Analyst',
@@ -88,13 +93,20 @@ export async function saveAuditReportToDb(payload: {
       payload.auditStatus,
       JSON.stringify(payload.rawAuditJson),
       payload.sha256Hash,
+      payload.tenantId || 'default-tenant',
+      payload.auditMode || 'standard',
     ]);
 
-    const reportId = rows[0]?.id;
+    const reportId = reportRes.rows[0]?.id;
 
-    if (reportId && payload.faultResults && Array.isArray(payload.faultResults)) {
+    if (!reportId) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Failed to obtain persisted report ID' };
+    }
+
+    if (payload.faultResults && Array.isArray(payload.faultResults)) {
       for (const fault of payload.faultResults) {
-        await executeQuery(
+        await client.query(
           `INSERT INTO fault_audit_results (report_id, fault_id, status, user_comment)
            VALUES ($1, $2, $3, $4)`,
           [reportId, fault.faultId, fault.status, fault.comment || '']
@@ -102,33 +114,46 @@ export async function saveAuditReportToDb(payload: {
       }
     }
 
+    await client.query('COMMIT');
     return { success: true, reportId };
   } catch (err: any) {
-    console.error('[PostgreSQL Save Report Error]:', err);
-    return { success: false, error: err?.message || 'Database error' };
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch {}
+    }
+    console.error('[PostgreSQL Atomic Save Error]:', err?.message || err);
+    return { success: false, error: err?.message || 'Database transaction failed' };
+  } finally {
+    if (client) client.release();
   }
 }
 
 /**
- * Fetch persisted audit reports for a specific scenario
+ * Fetch persisted audit reports for a specific scenario and tenant
  */
-export async function fetchAuditReportsFromDb(scenarioId: string): Promise<any[]> {
+export async function fetchAuditReportsFromDb(scenarioId: string, tenantId: string = 'default-tenant'): Promise<any[]> {
   if (!pool) return [];
-  return executeQuery(
-    `SELECT 
-      id,
-      scenario_id as "scenarioId",
-      user_name as "name",
-      user_role as "role",
-      device_type as "deviceType",
-      total_score as "totalScore",
-      audit_status as "status",
-      sha256_hash as "sha256Hash",
-      submitted_at as "submittedAt"
-    FROM audit_reports
-    WHERE scenario_id = $1
-    ORDER BY submitted_at DESC
-    LIMIT 50`,
-    [scenarioId]
-  );
+  try {
+    return await executeQuery(
+      `SELECT 
+        id,
+        scenario_id as "scenarioId",
+        user_name as "name",
+        user_role as "role",
+        device_type as "deviceType",
+        total_score as "totalScore",
+        audit_status as "status",
+        sha256_hash as "sha256Hash",
+        tenant_id as "tenantId",
+        audit_mode as "auditMode",
+        submitted_at as "submittedAt"
+      FROM audit_reports
+      WHERE scenario_id = $1 AND (tenant_id = $2 OR tenant_id = 'default-tenant')
+      ORDER BY submitted_at DESC
+      LIMIT 50`,
+      [scenarioId, tenantId]
+    );
+  } catch (err) {
+    console.warn('[PostgreSQL Fetch Reports Error]:', err);
+    return [];
+  }
 }

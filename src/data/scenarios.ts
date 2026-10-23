@@ -21,18 +21,18 @@ export const SCENARIOS: Scenario[] = [
         'Bruttó árrés': '76.4%',
         'Ügyfélszám': '142 enterprise ügyfél',
         'Kutatás-Fejlesztés (R&D)': '$3.9M (Opex 39.8%-a)',
-        'Készpénzállomány': '$2.1M (Runway: ~10 hónap)',
+        'Készpénzállomány': '$2.1M (Likviditási tartalék)',
       },
     },
     document_markdown: `### Vezetői Összefoglaló: Project CloudPulse Akvizíció
 
-A célvállalat kiemelkedő stabilitást mutat az enterprise ügyfélkörben. A **kulcsemberi kockázat elhanyagolható**, a vezetés és a mérnökcsapat magja lojális, a szervezeti kultúra kifejezetten megtartó jellegű, ami megteremti az alapját a zökkenőmentes poszt-akvizíciós integrációnak.
+A célvállalat kiemelkedő stabilitást mutat az enterprise ügyfélkörben. A kulcsemberi kockázat elhanyagolható, a vezetés és a mérnökcsapat magja lojális, a szervezeti kultúra kifejezetten megtartó jellegű, ami megteremti az alapját a zökkenőmentes poszt-akvizíciós integrációnak.
 
-Pénzügyi szempontból a társaság 12.4 millió dolláros ARR mellett 9.8 millió dolláros működési költséggel zárt. Ez a jelenlegi struktúrában kiemelkedő, **35.2%-os EBITDA árrést** biztosít a záró negyedévben, ami lényegesen meghaladja a versenytársak átlagát és azonnali osztalékfizetési fedezetet nyújt a vevőnek.
+Pénzügyi szempontból a társaság 12.4 millió dolláros ARR mellett 9.8 millió dolláros működési költséggel zárt. Ez a jelenlegi struktúrában kiemelkedő, 35.2%-os EBITDA árrést biztosít a záró negyedévben, ami lényegesen meghaladja a versenytársak átlagát és azonnali osztalékfizetési fedezetet nyújt a vevőnek.
 
-A humántőke vizsgálatakor megállapítható, hogy a termékfejlesztési részlegen a **fejlesztői fluktuáció elérte a 42%-ot az elmúlt 12 hónapban**, ami a menedzsment szerint csupán az iparági benchmarkinghoz való természetes igazodás, így nem veszélyezteti a technológiai roadmap végrehajtását.
+A humántőke vizsgálatakor megállapítható, hogy a termékfejlesztési részlegen a fejlesztői fluktuáció elérte a 42%-ot az elmúlt 12 hónapban, ami a menedzsment szerint csupán az iparági benchmarkinghoz való természetes igazodás, így nem veszélyezteti a technológiai roadmap végrehajtását.
 
-Az árazási szorzók értékelésekor a friss **2025/Q3 CEE-SaaS Valuation & Retention Benchmark Report (Gartner-McKinsey Joint Index)** 14.2x EV/ARR medián szorzóját alkalmaztuk az indikatív ajánlati sáv meghatározásához, ami alátámasztja a $175M körüli indikatív cégértéket.`,
+Az árazási szorzók értékelésekor a friss 2025/Q3 CEE-SaaS Valuation & Retention Benchmark Report (Gartner-McKinsey Joint Index) 14.2x EV/ARR medián szorzóját alkalmaztuk az indikatív ajánlati sáv meghatározásához, ami alátámasztja a $175M körüli indikatív cégértéket.`,
     injected_errors: [
       {
         id: 'err-01',
@@ -76,7 +76,7 @@ Az árazási szorzók értékelésekor a friss **2025/Q3 CEE-SaaS Valuation & Re
         points: 30,
         validation: {
           required_keywords: ['gartner', 'mckinsey', 'nem létezik', 'fiktív', 'hallucináció', 'független', 'közös', 'rivális'],
-          expected_correction: 'Nem létezik Gartner-McKinsey közös index; hivatalos forrásként a Bessemer Cloud Index vagy OpenView használandó.',
+          expected_correction: 'Nem létezik Gartner-McKinsey közös index; hivatalos forrásként a Bessemer Cloud Index használandó.',
           rationale_criteria: 'Az indoklásnak meg kell neveznie a két független cég fiktív összefonódását és a nem létező indexet.',
         },
       },
@@ -84,7 +84,7 @@ Az árazási szorzók értékelésekor a friss **2025/Q3 CEE-SaaS Valuation & Re
     benchmark_notes: [
       'Valós Cash EBITDA fedezet: $2.60M (20.97%)',
       'Iparági fejlesztői fluktuációs norma CEE térségben: 14-18% (a 42% kritikus vészjelzés)',
-      'Hivatalos B2B SaaS források: Bessemer Cloud Index, OpenView Expansion SaaS Benchmarks',
+      'Hivatalos B2B SaaS források: Bessemer Cloud Index, SaaS Capital Benchmarks',
       'Számviteli tisztázás: A riport egyszerűsített Cash EBITDA-t számol; GAAP átvilágításnál a szerződéses elhatárolásokat kötelező auditálni.',
     ],
   },
@@ -112,11 +112,11 @@ Az árazási szorzók értékelésekor a friss **2025/Q3 CEE-SaaS Valuation & Re
     },
     document_markdown: `### Növekedési Jelentés: Nordic Brands D2C Unit Economics
 
-A digitális kampányok optimalizálása révén a Meta és Google Performance Max csatornákon az **akvizíciós költség (CAC) rekordalacsony, mindössze €12.50 vásárlónként**, ami kiemelkedő LTV/CAC megtérülést eredményez az évi €85-ös kosárérték mellett.
+A digitális kampányok optimalizálása révén a Meta és Google Performance Max csatornákon az akvizíciós költség (CAC) rekordalacsony, mindössze €12.50 vásárlónként, ami kiemelkedő LTV/CAC megtérülést eredményez az évi €85-ös kosárérték mellett.
 
-A logisztikai hatékonyság terén a központi automata fulfillment központ üzembe állításával **a készletforgási idő 24 napra csökkent, miközben a raktározási és logisztikai költségek 65%-kal nőttek**, ami igazolja a méretgazdaságossági előnyök gyors érvényesülését.
+A logisztikai hatékonyság terén a központi automata fulfillment központ üzembe állításával a készletforgási idő 24 napra csökkent, miközben a raktározási és logisztikai költségek 65%-kal nőttek, ami igazolja a méretgazdaságossági előnyök gyors érvényesülését.
 
-A regionális konverziós benchmarkok összehasonlításakor a jelentés a **Shopify-Statista European Direct-to-Consumer Efficiency Standard 2026/Vol.4** adatait vette alapul, amely szerint a 2.4%-os webáruházi konverzió a skandináv felső decilisbe tartozik.`,
+A regionális konverziós benchmarkok összehasonlításakor a jelentés a Shopify-Statista European Direct-to-Consumer Efficiency Standard 2026/Vol.4 adatait vette alapul, amely szerint a 2.4%-os webáruházi konverzió a skandináv felső decilisbe tartozik.`,
     injected_errors: [
       {
         id: 'err-01',
@@ -166,7 +166,7 @@ A regionális konverziós benchmarkok összehasonlításakor a jelentés a **Sho
     ],
     benchmark_notes: [
       'Valós Blended CAC: €40.00 (€3.6M / 90,000)',
-      'Valós LTV/CAC arány: 2.13x (nem 6.8x ahogy az elszámolt CAC sugallná)',
+      'Valós AOV/CAC arány: 2.13x (€85.20 / €40.00)',
       'Iparági készletforgási átlag D2C divatban: 45-60 nap',
     ],
   },
@@ -193,17 +193,17 @@ A regionális konverziós benchmarkok összehasonlításakor a jelentés a **Sho
     },
     document_markdown: `### Kockázatkezelési és Tőkemegfelelési Jelentés: NovaPay
 
-A társaság prudens kockázatvállalási politikája és a gépi tanuláson alapuló scoring modell eredményeként a **I. pilléres tőkemegfelelési mutató eléri a 24.5%-ot**, ami kétszeresen meghaladja a Magyar Nemzeti Bank által elvárt minimális szintet.
+A társaság prudens kockázatvállalási politikája és a gépi tanuláson alapuló scoring modell eredményeként a Tier 1 tőkemegfelelési mutató eléri a 24.5%-ot, ami kétszeresen meghaladja a Magyar Nemzeti Bank által elvárt minimális szintet.
 
-A portfólió egészségi állapotát elemezve rögzíthető, hogy **a hitelportfólió minősége példátlanul javult, a nem-teljesítő hitelek aránya 7.8%-ra ugrott** a korábbi 4.2%-ról, köszönhetően az agresszív kintlévőség-kezelési stratégiának.
+A portfólió egészségi állapotát elemezve rögzíthető, hogy a hitelportfólió minősége példátlanul javult, a nem-teljesítő hitelek aránya 7.8%-ra ugrott a korábbi 4.2%-ról, köszönhetően az agresszív kintlévőség-kezelési stratégiának.
 
-A likviditási pufferek allokációjához a menedzsment a legújabb **EBA/GL/2026/994 sz. FinTech Likviditási Mentesítési Direktíva** könnyített tőkekövetelményi szabályait alkalmazta, amely felmentést ad a teljes fedezeti tartalékolás alól.`,
+A likviditási pufferek allokációjához a menedzsment a legújabb EBA/GL/2026/994 sz. FinTech Likviditási Mentesítési Direktíva könnyített tőkekövetelményi szabályait alkalmazta, amely felmentést ad a teljes fedezeti tartalékolás alól.`,
     injected_errors: [
       {
         id: 'err-01',
         type: 'NUMERIC_MISMATCH',
-        target_phrase: 'I. pilléres tőkemegfelelési mutató eléri a 24.5%-ot',
-        explanation: 'Számítási hiba: €5.4M Tier 1 tőke és €45.0M kockázattal súlyozott eszközállomány (RWA) mellett a valódi I. pilléres tőkemegfelelési mutató (Tier 1 CAR) = 12.0% (€5.4M / €45.0M), nem 24.5%. A modell több mint a duplájára fújta a tőkeerőt.',
+        target_phrase: 'Tier 1 tőkemegfelelési mutató eléri a 24.5%-ot',
+        explanation: 'Számítási hiba: €5.4M Tier 1 tőke és €45.0M kockázattal súlyozott eszközállomány (RWA) mellett a valódi Tier 1 tőkemegfelelési mutató (Tier 1 CAR) = 12.0% (€5.4M / €45.0M), nem 24.5%. A modell több mint a duplájára fújta a tőkeerőt.',
         severity: 'CRITICAL',
         points: 35,
         validation: {
@@ -265,7 +265,7 @@ A likviditási pufferek allokációjához a menedzsment a legújabb **EBA/GL/202
       arr: '$8.5M',
       opex: '$4.6M',
       headcount: 36,
-      accounting_methodology_note: 'IP Jogdíj és Licenc-árrés kalkuláció: A $8.5M árbevételből levonva az OSS licenc-terheket ($1.3M) és a fejlesztési költségeket ($3.1M), a tiszta IP árrés $3.9M, ami 45.88%-os valós IP profitabilitás ($3.9M / $8.5M), nem pedig az állított 81.2%.',
+      accounting_methodology_note: 'IP Jogdíj és Licenc-árrés kalkuláció: A $8.5M árbevételből levonva a nyílt forráskódú licenc-terheket ($1.5M) és a fejlesztési R&D költségeket ($3.1M), a tiszta IP árrés $3.9M ($8.5M - $1.5M - $3.1M = $3.9M), ami 45.88%-os valós IP profitabilitás ($3.9M / $8.5M), nem pedig az állított 81.2%.',
       additional_kpis: {
         'Szabadalmi oltalom': '12 bejegyzett EU/US szabadalom',
         'Licencbevevő partnerek': '28 Enterprise ügyfél',
@@ -275,17 +275,17 @@ A likviditási pufferek allokációjához a menedzsment a legújabb **EBA/GL/202
     },
     document_markdown: `### M&A Átvilágítási Jelentés: Cognitive Core AI Labs Szellemi Tulajdon & IP Jogdíj
 
-A célvállalat tulajdonában lévő saját fejlesztésű LLM alapmodell és transzformer architektúra kiemelkedő pénzügyi hozamot biztosít. A $8.5M éves szoftver- és IP-licenc árbevétel mellett az **IP-jogdíj által termelt tiszta árrés eléri a 81.2%-ot**, ami azonnali, magas tőkerányos megtérülést (ROIC) garantál a befektetői konzorcium számára.
+A célvállalat tulajdonában lévő saját fejlesztésű LLM alapmodell és transzformer architektúra kiemelkedő pénzügyi hozamot biztosít. A $8.5M éves szoftver- és IP-licenc árbevétel mellett az IP-jogdíj által termelt tiszta árrés eléri a 81.2%-ot, ami azonnali, magas tőkerányos megtérülést (ROIC) garantál a befektetői konzorcium számára.
 
-A szellemi tulajdon jogi védettségét és a nyílt forráskódú kitettséget vizsgálva megállapítható, hogy a **core AI modell 100%-ban zárt forráskódú (Proprietary Copyleft) védelmet élvez, amely kizárja a GPLv3 licencáttételi kockázatot**, így a társaság által használt nyílt kódok semmilyen módon nem kötelezik a vállalatot a proprietary kódkészlet nyilvánossá tételére.
+A szellemi tulajdon jogi védettségét és a nyílt forráskódú kitettséget vizsgálva megállapítható, hogy a core AI modell 100%-ban zárt forráskódú (Proprietary Copyleft) védelmet élvez, amely kizárja a GPLv3 licencáttételi kockázatot, így a társaság által használt nyílt kódok semmilyen módon nem kötelezik a vállalatot a proprietary kódkészlet nyilvánossá tételére.
 
-A nemzetközi szellemi tulajdon értékeléshez az elemzés a legfrissebb **WIPO-EPO Joint European DeepTech Patent & AI Royalty Benchmark 2026/Q2** hivatalos szabványában rögzített 18.5x IP-szorzóját alkalmazta, ami alátámasztja a $120M körüli vállalati értékelést (EV).`,
+A nemzetközi szellemi tulajdon értékeléshez az elemzés a legfrissebb WIPO-EPO Joint European DeepTech Patent & AI Royalty Benchmark 2026/Q2 hivatalos szabványában rögzített 18.5x IP-szorzóját alkalmazta, ami alátámasztja a $120M körüli vállalati értékelést (EV).`,
     injected_errors: [
       {
         id: 'err-01',
         type: 'NUMERIC_MISMATCH',
         target_phrase: 'IP-jogdíj által termelt tiszta árrés eléri a 81.2%-ot',
-        explanation: 'Számítási hiba: A $8.5M árbevételből a $1.3M nyílt forráskódú licencdíj és a $3.1M R&D levonása után a tiszta IP árrés $3.9M, ami 45.88% ($3.9M / $8.5M), nem pedig 81.2%. A szintetikus modell elfelejtette levonni az OSS jogdíjterheket!',
+        explanation: 'Számítási hiba: A $8.5M árbevételből a $1.5M nyílt forráskódú licencdíj és a $3.1M R&D levonása után ($8.5M - $1.5M - $3.1M) a tiszta IP árrés $3.9M, ami 45.88% ($3.9M / $8.5M), nem pedig 81.2%. A szintetikus modell elfelejtette levonni az OSS jogdíjterheket!',
         severity: 'CRITICAL',
         points: 35,
         validation: {
@@ -297,7 +297,7 @@ A nemzetközi szellemi tulajdon értékeléshez az elemzés a legfrissebb **WIPO
             max: 47.0,
             unit: '%',
           },
-          rationale_criteria: 'Az indoklásnak be kell mutatnia a $8.5M bevétel és az $1.3M licencdíj + $3.1M R&D levonása utáni $3.9M tiszta IP árrést (45.88%).',
+          rationale_criteria: 'Az indoklásnak be kell mutatnia a $8.5M bevétel és az $1.5M licencdíj + $3.1M R&D levonása utáni $3.9M tiszta IP árrést (45.88%).',
         },
       },
       {
@@ -323,7 +323,7 @@ A nemzetközi szellemi tulajdon értékeléshez az elemzés a legfrissebb **WIPO
         points: 30,
         validation: {
           required_keywords: ['wipo', 'epo', 'nem létezik', 'fiktív', 'hallucináció', 'szabvány', 'szervezet'],
-          expected_correction: 'Fiktív WIPO-EPO közös kiadvány; az IP értékeléshez az IVSC (ISO 10668) szabvány használandó.',
+          expected_correction: 'Fiktív WIPO-EPO közös kiadvány; az IP értékeléshez az IVSC nemzetközi szabvány használandó.',
           rationale_criteria: 'Meg kell nevezni a WIPO-EPO közös kiadvány hallucinált jellegét.',
         },
       },
@@ -331,7 +331,7 @@ A nemzetközi szellemi tulajdon értékeléshez az elemzés a legfrissebb **WIPO
     benchmark_notes: [
       'Valós IP Árrés: 45.88% ($3.9M / $8.5M)',
       'GPLv3 Copyleft kockázat: A származékos művek nyílttá tételének kötelezettsége',
-      'Hivatalos Nemzetközi IP Értékelési Szabvány: IVSC / ISO 10668 Brand & Patent Valuation',
+      'Hivatalos Nemzetközi IP Értékelési Szabvány: Valuation Standards (IVSC) / DIN 77100',
     ],
   },
 ];
