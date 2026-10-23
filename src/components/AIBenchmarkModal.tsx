@@ -81,6 +81,7 @@ export function AIBenchmarkModal({
     setErrorMessage(null);
     try {
       const res = await runLiveAIBenchmark(scenario, 'gemini-3.8-flash');
+      if (!res.success) throw new Error('Nem sikerült a modellfuttatás.');
       setLiveAIResult(res.evaluation);
       setLiveLatencyMs(res.latencyMs);
 
@@ -89,13 +90,13 @@ export function AIBenchmarkModal({
         const existingIdx = prev.findIndex((m) => m.modelId === 'gemini-3-8-flash');
         const newProfile: BenchmarkModelProfile = {
           modelId: 'gemini-3-8-flash',
-          modelName: 'Gemini 3.8 Flash (Éles Futtatás)',
+          modelName: res.isLive ? 'Gemini (LIVE AI)' : 'Gemini (SIMULATED)',
           provider: 'Google',
           type: 'ai_agent',
           latencyMs: res.latencyMs,
           hallucinationVulnerability: res.evaluation.falsePositivesCount === 0 ? 'Alacsony (0%)' : 'Közepes',
           blindSpotRate: `${Math.round((res.evaluation.missedErrorsCount / scenario.injected_errors.length) * 100)}%`,
-          summary: res.note || 'Éles szerveroldali hívás a Gemini API-n keresztül, determinisztikus pontozással.',
+          summary: res.isLive ? 'LIVE API-válasz, determinisztikus pontozással.' : (res.note || 'Szimulált válasz, nem valós modellmérés.'),
           annotations: res.evaluation.detailedMatches.flatMap((m) => (m.userAnnotation ? [m.userAnnotation] : [])),
           evaluation: res.evaluation,
         };
