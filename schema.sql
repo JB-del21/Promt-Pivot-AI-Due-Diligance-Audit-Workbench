@@ -42,3 +42,11 @@ CREATE INDEX IF NOT EXISTS idx_reports_scenario ON audit_reports(scenario_id);
 CREATE INDEX IF NOT EXISTS idx_reports_tenant ON audit_reports(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_reports_hash ON audit_reports(sha256_hash);
 CREATE INDEX IF NOT EXISTS idx_fault_results_report ON fault_audit_results(report_id);
+
+-- v7.1: cross-instance benchmark quota. Apply migration before enabling protected APIs.
+CREATE TABLE IF NOT EXISTS benchmark_rate_limits (
+  tenant_id VARCHAR(128) NOT NULL,
+  window_start TIMESTAMP WITH TIME ZONE NOT NULL,
+  request_count INTEGER NOT NULL CHECK (request_count BETWEEN 1 AND 10),
+  PRIMARY KEY (tenant_id, window_start)
+);
