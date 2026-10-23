@@ -339,30 +339,8 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return updated;
     });
 
-    // Real-time background sync to PostgreSQL / Supabase Database
-    try {
-      fetch('/api/reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scenarioId: currentScenario.scenario_id,
-          userName: userProfile.name,
-          userRole: userProfile.role,
-          deviceType: 'web',
-          totalScore: result.totalScore,
-          auditStatus: grade,
-          rawAuditJson: JSON.parse(result.canonicalPayload),
-          sha256Hash: result.canonicalHash,
-          faultResults: result.detailedMatches.map((m) => ({
-            faultId: m.injectedError?.id || 'unknown',
-            status: m.status === 'TRUE_POSITIVE' ? 'CAUGHT' : m.status === 'PARTIAL_MATCH' ? 'PARTIAL' : 'BLIND_SPOT',
-            comment: m.feedbackNotes,
-          })),
-        }),
-      }).catch((e) => console.warn('Database background sync notice:', e));
-    } catch (e) {
-      console.warn('Background fetch error:', e);
-    }
+    // Local demo reports are not authenticated server records. No silent writes.
+    // Verified server submissions require a future signed-in identity and explicit API handling.
   };
 
   const selectScenario = (scenario: Scenario) => {
