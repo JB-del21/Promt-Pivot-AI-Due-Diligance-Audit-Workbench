@@ -59,7 +59,9 @@ const validateBenchmarkPayload = (req: Request, res: Response, next: NextFunctio
       executionState: 'FAILED',
     });
   }
-  if (!SCENARIOS.some(s=>s.scenario_id===scenarioId)) return res.status(400).json({error:'Unknown scenario',executionState:'FAILED'});
+  const selectedScenario = SCENARIOS.find(s=>s.scenario_id===scenarioId);
+  if (!selectedScenario) return res.status(400).json({error:'Unknown scenario',executionState:'FAILED'});
+  if (documentText !== selectedScenario.document_markdown) return res.status(400).json({error:'Document does not match calibrated scenario',executionState:'FAILED'});
   next();
 };
 
@@ -427,6 +429,7 @@ app.post('/api/benchmark/run', benchmarkRateLimiter, validateBenchmarkPayload, a
       apiKey: apiKey,
       httpOptions: {
         timeout: 10000,
+        retryOptions: { attempts: 1 },
       },
     });
 
