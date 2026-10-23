@@ -229,10 +229,11 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             const isSelected = selectedAnnotationId === ann.id;
 
             return (
-              <span
+              <button
                 key={partIdx}
+                type="button"
                 onClick={() => onSelectAnnotation(ann.id)}
-                className={`relative inline-block px-1 py-0.5 rounded cursor-pointer transition-all border-b-2 ${
+                className={`relative inline-block px-1 py-0.5 rounded cursor-pointer transition-all border-b-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                   meta.border
                 } ${meta.bg} ${
                   isSelected ? 'ring-2 ring-white/30 font-semibold text-white' : 'hover:bg-opacity-20 text-neutral-100'
@@ -247,7 +248,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 >
                   {meta.shortLabel}
                 </span>
-              </span>
+              </button>
             );
           })}
         </p>

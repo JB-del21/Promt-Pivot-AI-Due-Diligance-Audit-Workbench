@@ -3,10 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
+import { AuditProvider, useAudit } from './context/AuditContext';
 import { SCENARIOS } from './data/scenarios';
-import type { Scenario, UserAnnotation, ErrorType, EvaluationResult } from './types/audit';
-import { evaluateAudit } from './utils/auditScoring';
 import { TopBar } from './components/TopBar';
 import { DocumentViewer } from './components/DocumentViewer';
 import { AuditPanel } from './components/AuditPanel';
@@ -15,173 +14,49 @@ import { PodcastContextModal } from './components/PodcastContextModal';
 import { ScenarioSelectorModal } from './components/ScenarioSelectorModal';
 import { SystemDocumentationModal } from './components/SystemDocumentationModal';
 import { AIBenchmarkModal } from './components/AIBenchmarkModal';
+import { AuditHistoryModal } from './components/AuditHistoryModal';
 import { AuditReportView } from './components/AuditReportView';
 import { CohortDashboardView } from './components/CohortDashboardView';
 
-export default function App() {
-  // Scenario state
-  const [currentScenario, setCurrentScenario] = useState<Scenario>(SCENARIOS[0]);
+function WorkbenchContent() {
+  const {
+    currentScenario,
+    activeView,
+    evaluation,
+    annotations,
+    selectedAnnotationId,
+    isStrictMode,
+    mobileTab,
 
-  // Primary navigation view: 'WORKBENCH' (the redlining workbench or report) | 'COHORT' (the cohort dashboard)
-  const [activeView, setActiveView] = useState<'WORKBENCH' | 'COHORT'>('WORKBENCH');
+    isCalculatorOpen,
+    isDocumentationModalOpen,
+    isPodcastModalOpen,
+    isScenarioModalOpen,
+    isBenchmarkModalOpen,
 
-  // Didactic difficulty mode: true = Strict / Blind (no bold helpers), false = Guided (bold keywords shown)
-  const [isStrictMode, setIsStrictMode] = useState<boolean>(true);
+    selectScenario,
+    addAnnotation,
+    updateAnnotation,
+    deleteAnnotation,
+    selectAnnotation,
+    resetAudit,
+    submitAudit,
+    toggleStrictMode,
+    setActiveView,
+    setMobileTab,
+    selectNextScenario,
 
-  // Audit state
-  const [annotations, setAnnotations] = useState<UserAnnotation[]>([]);
-  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
-  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
-
-  // Timer state
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Modals state
-  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
-  const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false);
-  const [isPodcastModalOpen, setIsPodcastModalOpen] = useState(false);
-  const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
-  const [isBenchmarkModalOpen, setIsBenchmarkModalOpen] = useState(false);
-
-  // Mobile layout tab toggle: 'doc' | 'panel'
-  const [mobileTab, setMobileTab] = useState<'doc' | 'panel'>('doc');
-
-  // Timer lifecycle: run while not evaluated
-  useEffect(() => {
-    if (evaluation) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [evaluation]);
-
-  // Keyboard shortcut listener (Cmd+K or Escape)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsCalculatorOpen(false);
-        setIsDocumentationModalOpen(false);
-        setIsPodcastModalOpen(false);
-        setIsScenarioModalOpen(false);
-        setIsBenchmarkModalOpen(false);
-        setSelectedAnnotationId(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Add annotation from text selection
-  const handleAddAnnotation = (targetPhrase: string, type: ErrorType) => {
-    // Avoid exact duplicate annotation
-    const existing = annotations.find(
-      (a) => a.target_phrase.toLowerCase() === targetPhrase.toLowerCase()
-    );
-    if (existing) {
-      setSelectedAnnotationId(existing.id);
-      setMobileTab('panel');
-      return;
-    }
-
-    const newAnnotation: UserAnnotation = {
-      id: `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      scenarioId: currentScenario.scenario_id,
-      target_phrase: targetPhrase,
-      selectedType: type,
-      justification: '',
-      proposedCorrection: '',
-      timestamp: Date.now(),
-    };
-
-    setAnnotations((prev) => [...prev, newAnnotation]);
-    setSelectedAnnotationId(newAnnotation.id);
-    setMobileTab('panel');
-  };
-
-  // Update annotation properties
-  const handleUpdateAnnotation = (id: string, updates: Partial<UserAnnotation>) => {
-    setAnnotations((prev) =>
-      prev.map((ann) => (ann.id === id ? { ...ann, ...updates } : ann))
-    );
-  };
-
-  // Delete annotation
-  const handleDeleteAnnotation = (id: string) => {
-    setAnnotations((prev) => prev.filter((ann) => ann.id !== id));
-    if (selectedAnnotationId === id) {
-      setSelectedAnnotationId(null);
-    }
-  };
-
-  // Reset current audit session
-  const handleResetAudit = () => {
-    setAnnotations([]);
-    setSelectedAnnotationId(null);
-    setEvaluation(null);
-    setElapsedSeconds(0);
-  };
-
-  // Submit and evaluate audit
-  const handleSubmitAudit = async () => {
-    const result = await evaluateAudit(
-      currentScenario.injected_errors,
-      annotations,
-      elapsedSeconds,
-      currentScenario.scenario_id,
-      isStrictMode ? 'STRICT' : 'GUIDED'
-    );
-    setEvaluation(result);
-  };
-
-  // Switch scenario
-  const handleSelectScenario = (scenario: Scenario) => {
-    setCurrentScenario(scenario);
-    setAnnotations([]);
-    setSelectedAnnotationId(null);
-    setEvaluation(null);
-    setElapsedSeconds(0);
-    setMobileTab('doc');
-  };
-
-  // Next scenario trigger
-  const handleSelectNextScenario = () => {
-    const currentIndex = SCENARIOS.findIndex(
-      (s) => s.scenario_id === currentScenario.scenario_id
-    );
-    const nextIndex = (currentIndex + 1) % SCENARIOS.length;
-    handleSelectScenario(SCENARIOS[nextIndex]);
-  };
+    setIsCalculatorOpen,
+    setIsDocumentationModalOpen,
+    setIsPodcastModalOpen,
+    setIsScenarioModalOpen,
+    setIsBenchmarkModalOpen,
+  } = useAudit();
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-neutral-900 text-neutral-100 antialiased font-sans">
       {/* 3-Zone Top Navigation Bar */}
-      <TopBar
-        currentScenario={currentScenario}
-        elapsedSeconds={elapsedSeconds}
-        annotationCount={annotations.length}
-        onOpenCalculator={() => setIsCalculatorOpen(true)}
-        onOpenDocumentationModal={() => setIsDocumentationModalOpen(true)}
-        onOpenPodcastModal={() => setIsPodcastModalOpen(true)}
-        onOpenBenchmarkModal={() => setIsBenchmarkModalOpen(true)}
-        onOpenScenarioSelector={() => setIsScenarioModalOpen(true)}
-        onResetAudit={handleResetAudit}
-        onSubmitAudit={handleSubmitAudit}
-        isEvaluated={Boolean(evaluation)}
-        onReturnToWorkbench={() => {
-          setEvaluation(null);
-          setActiveView('WORKBENCH');
-        }}
-        activeView={activeView}
-        onSelectView={setActiveView}
-      />
+      <TopBar />
 
       {/* Main Content Area */}
       {activeView === 'COHORT' ? (
@@ -190,7 +65,7 @@ export default function App() {
           onReturnToWorkbench={() => setActiveView('WORKBENCH')}
           onSelectScenario={(scenarioId) => {
             const s = SCENARIOS.find((item) => item.scenario_id === scenarioId);
-            if (s) handleSelectScenario(s);
+            if (s) selectScenario(s);
           }}
         />
       ) : !evaluation ? (
@@ -199,20 +74,20 @@ export default function App() {
           <div className="flex lg:hidden items-center border-b border-neutral-800 bg-neutral-950 px-4 py-2 gap-2 text-xs select-none">
             <button
               onClick={() => setMobileTab('doc')}
-              className={`flex-1 py-1.5 rounded text-center font-medium transition-colors ${
+              className={`flex-1 py-1.5 rounded text-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                 mobileTab === 'doc'
-                  ? 'bg-neutral-800 text-white'
-                  : 'text-neutral-400 hover:text-neutral-200'
+                  ? 'bg-neutral-800 text-white font-semibold'
+                  : 'text-neutral-300 hover:text-white'
               }`}
             >
               Dokumentum
             </button>
             <button
               onClick={() => setMobileTab('panel')}
-              className={`flex-1 py-1.5 rounded text-center font-medium transition-colors ${
+              className={`flex-1 py-1.5 rounded text-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                 mobileTab === 'panel'
-                  ? 'bg-neutral-800 text-white'
-                  : 'text-neutral-400 hover:text-neutral-200'
+                  ? 'bg-neutral-800 text-white font-semibold'
+                  : 'text-neutral-300 hover:text-white'
               }`}
             >
               Audit Panel ({annotations.length})
@@ -230,12 +105,12 @@ export default function App() {
               annotations={annotations}
               selectedAnnotationId={selectedAnnotationId}
               onSelectAnnotation={(id) => {
-                setSelectedAnnotationId(id);
+                selectAnnotation(id);
                 if (id) setMobileTab('panel');
               }}
-              onAddAnnotation={handleAddAnnotation}
+              onAddAnnotation={addAnnotation}
               isStrictMode={isStrictMode}
-              onToggleStrictMode={() => setIsStrictMode((prev) => !prev)}
+              onToggleStrictMode={toggleStrictMode}
             />
           </div>
 
@@ -249,11 +124,11 @@ export default function App() {
               scenario={currentScenario}
               annotations={annotations}
               selectedAnnotationId={selectedAnnotationId}
-              onSelectAnnotation={setSelectedAnnotationId}
-              onUpdateAnnotation={handleUpdateAnnotation}
-              onDeleteAnnotation={handleDeleteAnnotation}
+              onSelectAnnotation={selectAnnotation}
+              onUpdateAnnotation={updateAnnotation}
+              onDeleteAnnotation={deleteAnnotation}
               onOpenCalculator={() => setIsCalculatorOpen(true)}
-              onSubmitAudit={handleSubmitAudit}
+              onSubmitAudit={submitAudit}
             />
           </div>
         </div>
@@ -262,8 +137,8 @@ export default function App() {
         <AuditReportView
           scenario={currentScenario}
           evaluation={evaluation}
-          onReset={handleResetAudit}
-          onSelectNextScenario={handleSelectNextScenario}
+          onReset={resetAudit}
+          onSelectNextScenario={selectNextScenario}
           onOpenBenchmark={() => setIsBenchmarkModalOpen(true)}
           onOpenCohort={() => setActiveView('COHORT')}
         />
@@ -290,7 +165,7 @@ export default function App() {
         isOpen={isScenarioModalOpen}
         onClose={() => setIsScenarioModalOpen(false)}
         currentScenarioId={currentScenario.scenario_id}
-        onSelectScenario={handleSelectScenario}
+        onSelectScenario={selectScenario}
       />
 
       <AIBenchmarkModal
@@ -299,6 +174,16 @@ export default function App() {
         scenario={currentScenario}
         userEvaluation={evaluation}
       />
+
+      <AuditHistoryModal />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuditProvider>
+      <WorkbenchContent />
+    </AuditProvider>
   );
 }

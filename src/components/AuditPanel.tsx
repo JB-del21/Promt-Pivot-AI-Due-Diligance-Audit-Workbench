@@ -172,10 +172,11 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
                 const hasCorrection = ann.proposedCorrection.trim().length > 0;
 
                 return (
-                  <div
+                  <button
                     key={ann.id}
+                    type="button"
                     onClick={() => onSelectAnnotation(ann.id)}
-                    className={`p-3.5 rounded-lg border transition-all text-xs ${
+                    className={`w-full text-left p-3.5 rounded-lg border transition-all text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                       isSelected
                         ? 'bg-neutral-900 border-neutral-600 ring-1 ring-neutral-500 shadow-md'
                         : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700'
@@ -280,7 +281,7 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
                         Számszaki hibánál add meg a korrigált számot (levezetéssel együtt is jó, pl. 12.4 - 9.8 = 2.6, azaz 20.97%). Egyéb hibánál fogalmazd meg a helyes tényt legalább 3 szóban.
                       </p>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
