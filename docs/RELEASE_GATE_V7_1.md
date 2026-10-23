@@ -23,11 +23,13 @@ Apply the `benchmark_rate_limits` table addition in `schema.sql` using a migrati
 5. Paid LLM calls use database-backed 10/min/tenant budget and SDK-owned 10 second request timeout; no key/failed provider yields FAILED rather than fabricated benchmark.
 6. Browser practice submissions remain local only until an authenticated sign-in flow is connected. Local hashes are not audit certificates.
 
-### Validation evidence and open gates
-- 6 new isolated pure security tests passed locally under Node.js 22 with temporary import-path adaptation. These are **not** equivalent to a complete repository CI PASS.
-- Full `npm install`, `npm run lint`, `npm test`, `npm run build` and Vercel Preview integration have **not** been independently verified for this branch.
-- HTTP integration tests against a disposable Postgres database, tenant A/B JWTs, simulated DB rollback, and DB certificate trust are still required.
-- Real identity provider setup, signed-in frontend, migration review, benchmark model validation and external report attestation remain open.
-- The `/api/benchmark/presets` response is illustrative synthetic data and not a model performance measurement.
+### CI evidence and open gates
 
-**Do not merge to production** until the remaining tests and identity/database setup are verified. Existing frontend API widgets will show authorization errors until sign-in exists.
+- GitHub Actions run [#14](https://github.com/JB-del21/Promt-Pivot-AI-Due-Diligance-Audit-Workbench/actions/runs/39994461497) independently passed **43/43 tests**, `npm run lint`, and `npm run build` on Node 22.
+- The CI includes a disposable PostgreSQL 16 database and tests tenant A/B reads, tenant-crossing HTTP verification, immutable inserts, transaction rollback, digest tampering and per-tenant quota enforcement.
+- The project now also checks explicit simple addition/subtraction equations. That is a narrow falsifier, **not** proof of domain-wide mathematical or legal correctness.
+- Existing `bun.lock` was stale/incompatible and removed. **No current package-lock.json has been committed yet**, so dependency reproducibility remains an open production gate.
+- Full Vercel preview smoke tests, real identity provider/issuer configuration, schema migration in a controlled production-like environment, audit ground-truth expert review, and independently attested certificates remain open.
+- Deploying this branch without a real login will intentionally cause protected API calls to return authorization errors. This is fail-closed but not a complete B2B user flow.
+
+**Do not merge to production** until these remaining gates are addressed. The current PR remains in Draft status.
