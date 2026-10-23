@@ -834,6 +834,11 @@ app.get('/api/cohort/metrics', async (req: Request, res: Response) => {
 
 // Setup Vite middleware in dev or static serving in production
 async function startServer() {
+  if (process.env.VERCEL === '1') {
+    // In Vercel Serverless Functions, Vercel routes HTTP requests directly into `app`
+    return;
+  }
+
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -854,3 +859,5 @@ async function startServer() {
 }
 
 startServer();
+
+export default app;
