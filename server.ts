@@ -7,7 +7,9 @@ import { SCENARIOS } from './src/data/scenarios';
 import { evaluateAudit, canonicalizeJson, sha256 } from './src/utils/auditScoring';
 import type { InjectedError, UserAnnotation, ErrorType } from './src/types/audit';
 import type { CohortAnalysisData, CohortParticipant, FaultDetectionStatus } from './src/types/cohort';
-import { saveAuditReportToDb, fetchAuditReportsFromDb, executeQuery } from './src/db/client';
+import { saveAuditReportToDb, fetchAuditReportsFromDb, executeQuery, consumeBenchmarkQuota } from './src/db/client';
+import { verifyAccessToken } from './src/security/auth';
+import { verifyStoredReport } from './src/security/reportIntegrity';
 
 dotenv.config();
 
@@ -28,57 +30,18 @@ declare global {
   }
 }
 
-// ==========================================
-// P0-01: Session Token & Tenant Isolation Middleware
-// ==========================================
-const validateApiAuth = (req: Request, res: Response, next: NextFunction) => {
-  const tenantHeader = req.headers['x-tenant-id'] as string;
-  const authHeader = req.headers['authorization'] as string;
-
-  // Extract or default tenant identifier
-  let tenantId = tenantHeader ? tenantHeader.trim() : 'default-tenant';
-
-  // Optional bearer token parsing for enterprise multi-tenancy
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7).trim();
-    if (token.includes('-tenant-')) {
-      tenantId = token.split('-tenant-')[1] || tenantId;
-    }
-  }
-
-  req.tenantId = tenantId;
-  next();
+// Protected routes require issuer-signed RS256 JWTs. Never trust x-tenant-id.
+const requireApiAuth = (req: Request,res: Response,next: NextFunction) => {
+ const auth=verifyAccessToken(req.headers.authorization,{publicKey:process.env.AUTH_JWT_PUBLIC_KEY,issuer:process.env.AUTH_JWT_ISSUER,audience:process.env.AUTH_JWT_AUDIENCE});
+ if(!auth.ok) return res.status(auth.status).json({error:auth.error});
+ req.tenantId=auth.principal.tenantId; next();
 };
-
-app.use(validateApiAuth);
-
-// ==========================================
-// P0-05: Rate Limiter Middleware for LLM Endpoints
-// ==========================================
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-
-const benchmarkRateLimiter = (req: Request, res: Response, next: NextFunction) => {
-  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || '127.0.0.1';
-  const now = Date.now();
-  const windowMs = 60 * 1000; // 1 minute window
-  const maxRequests = 10; // Max 10 benchmark calls per minute per IP
-
-  const record = rateLimitMap.get(clientIp);
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(clientIp, { count: 1, resetTime: now + windowMs });
-    return next();
-  }
-
-  if (record.count >= maxRequests) {
-    return res.status(429).json({
-      error: 'Too many benchmark execution requests. Rate limit exceeded (10 req/min).',
-      retryAfterSeconds: Math.ceil((record.resetTime - now) / 1000),
-      executionState: 'FAILED',
-    });
-  }
-
-  record.count += 1;
-  next();
+app.use('/api/reports',requireApiAuth);
+app.use('/api/cohort',requireApiAuth);
+app.use('/api/benchmark/run',requireApiAuth);
+const benchmarkRateLimiter=async(req: Request,res: Response,next: NextFunction)=>{
+ try {if(!(await consumeBenchmarkQuota(req.tenantId))) return res.status(429).json({error:'LLM quota exceeded',executionState:'FAILED'});next();}
+ catch{return res.status(503).json({error:'Quota storage unavailable',executionState:'FAILED'});}
 };
 
 // Zero-Trust Request Validation Middleware for LLM Routes
@@ -90,34 +53,18 @@ const validateBenchmarkPayload = (req: Request, res: Response, next: NextFunctio
   if (!documentText || typeof documentText !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid documentText parameter', executionState: 'FAILED' });
   }
-  if (documentText.length > 20000) {
+  if (documentText.length > 12000) {
     return res.status(413).json({
-      error: 'Document exceeds maximum allowed length of 20,000 characters',
+      error: 'Document exceeds maximum allowed length of 12,000 characters',
       executionState: 'FAILED',
     });
   }
+  if (!SCENARIOS.some(s=>s.scenario_id===scenarioId)) return res.status(400).json({error:'Unknown scenario',executionState:'FAILED'});
   next();
 };
 
 // Healthcheck V2 with DB & Tenant Health
-app.get('/api/health', async (req: Request, res: Response) => {
-  let isDbConnected = false;
-  try {
-    const dbTest = await executeQuery('SELECT 1 as test');
-    isDbConnected = dbTest.length > 0;
-  } catch {
-    isDbConnected = false;
-  }
-
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    tenantId: req.tenantId,
-    isDbConnected,
-    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'),
-    modelsSupported: ['gemini-3.8-flash', 'claude-3.5-sonnet', 'gpt-4o', 'llama-3-70b'],
-  });
-});
+app.get('/api/health',(_req: Request,res: Response)=>res.json({status:'ok'}));
 
 // ==========================================
 // P0-02: Server-Side Score Re-Evaluation & Canonical Hash Generation
@@ -138,7 +85,10 @@ app.post('/api/reports', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required scenarioId string' });
     }
 
-    const scenario = SCENARIOS.find((s) => s.scenario_id === scenarioId) || SCENARIOS[0];
+    const scenario=SCENARIOS.find(s=>s.scenario_id===scenarioId);
+    if(!scenario) return res.status(400).json({error:'Unknown scenario'});
+    if(!Array.isArray(annotations)||annotations.length>30||annotations.some(a=>!a||typeof a!=='object'||typeof a.target_phrase!=='string'||a.target_phrase.length>1000||typeof a.justification!=='string'||a.justification.length>4000||typeof a.proposedCorrection!=='string'||a.proposedCorrection.length>2000||typeof a.selectedType!=='string'))return res.status(400).json({error:'Invalid annotations'});
+    if(typeof elapsedSeconds!=='number'||!Number.isFinite(elapsedSeconds)||elapsedSeconds<0||elapsedSeconds>86400||typeof isStrictMode!=='boolean'||typeof userName!=='string'||userName.length>255||typeof userRole!=='string'||userRole.length>100||typeof deviceType!=='string'||deviceType.length>50)return res.status(400).json({error:'Invalid report metadata'});
 
     // P0-02 CORE FIX: Re-evaluate annotations on the server side using the deterministic grading kernel!
     const serverEvaluation = await evaluateAudit(
@@ -208,7 +158,8 @@ app.post('/api/reports', async (req: Request, res: Response) => {
       faultResults,
     });
 
-    res.status(200).json({
+    if(!dbResult.success)return res.status(503).json({success:false,persistedToDb:false,error:'Report persistence failed'});
+    res.status(201).json({
       success: true,
       sha256Hash: serverSha256Hash,
       serverVerifiedScore: serverEvaluation.totalScore,
@@ -221,7 +172,7 @@ app.post('/api/reports', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Error in server-evaluated audit report submission:', err);
-    res.status(500).json({ error: 'Failed to evaluate and save report', details: err?.message });
+    res.status(500).json({ error: 'Failed to evaluate and save report', details: undefined });
   }
 });
 
@@ -231,7 +182,7 @@ app.post('/api/reports', async (req: Request, res: Response) => {
 app.post('/api/reports/verify', async (req: Request, res: Response) => {
   try {
     const { sha256Hash } = req.body;
-    if (!sha256Hash || typeof sha256Hash !== 'string') {
+    if (typeof sha256Hash !== 'string' || !/^SHA256:[a-f0-9]{64}$/.test(sha256Hash)) {
       return res.status(400).json({ error: 'Missing sha256Hash parameter', verified: false });
     }
 
@@ -252,8 +203,8 @@ app.post('/api/reports/verify', async (req: Request, res: Response) => {
         raw_audit_json as "rawAuditJson",
         submitted_at as "submittedAt"
        FROM audit_reports
-       WHERE sha256_hash = $1 OR sha256_hash = $2`,
-      [trimmedHash, trimmedHash.replace(/^SHA256:/i, '')]
+       WHERE sha256_hash = $1 AND tenant_id = $2`,
+      [trimmedHash, req.tenantId]
     );
 
     if (rows.length === 0) {
@@ -266,8 +217,8 @@ app.post('/api/reports/verify', async (req: Request, res: Response) => {
       });
     }
 
-    const record = rows[0];
-
+    const record=rows[0];
+    if(!(await verifyStoredReport(record)))return res.status(409).json({verified:false,error:'Report integrity mismatch'});
     return res.json({
       verified: true,
       persistedInDb: true,
@@ -287,7 +238,7 @@ app.post('/api/reports/verify', async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    res.status(500).json({ error: 'Verification error', details: err?.message, verified: false });
+    res.status(500).json({ error: 'Verification error', details: undefined, verified: false });
   }
 });
 
@@ -455,7 +406,7 @@ app.get('/api/benchmark/presets', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Error generating benchmark presets:', err);
-    res.status(500).json({ error: 'Internal benchmark error', details: err?.message });
+    res.status(500).json({ error: 'Internal benchmark error', details: undefined });
   }
 });
 
@@ -469,60 +420,13 @@ app.post('/api/benchmark/run', benchmarkRateLimiter, validateBenchmarkPayload, a
   const scenario = SCENARIOS.find((s) => s.scenario_id === scenarioId) || SCENARIOS[0];
   const apiKey = process.env.GEMINI_API_KEY;
 
-  // Fallback to calibrated simulation if key is not configured
-  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
-    const elapsedSec = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-    const simulatedAnnotations: UserAnnotation[] = [
-      {
-        id: `gemini-sim-${Date.now()}-1`,
-        scenarioId: scenario.scenario_id,
-        target_phrase: scenario.injected_errors[0]?.target_phrase || '142%-os nettó árbevétel-megtartási rátával (NDR)',
-        selectedType: scenario.injected_errors[0]?.type || 'NUMERIC_MISMATCH',
-        justification: `Részletes pénzügyi auditálás során a megadott adat ellentmond a dokumentum egyéb mutatóinak. A(z) ${scenario.context.target_name} jelentésében szereplő számítási levezetés nem megalapozott.`,
-        proposedCorrection: scenario.injected_errors[0]?.validation.expected_correction || '116%',
-        timestamp: Date.now(),
-      },
-      {
-        id: `gemini-sim-${Date.now()}-2`,
-        scenarioId: scenario.scenario_id,
-        target_phrase: scenario.injected_errors[1]?.target_phrase || 'Garner Enterprise SaaS Index (2024. Q3)',
-        selectedType: scenario.injected_errors[1]?.type || 'FABRICATED_SOURCE',
-        justification: 'A hivatkozott piaci index nem létezik a standard elemzői adatbázisokban; hallucinált vagy szintetikus forrás.',
-        proposedCorrection: 'A nem létező forrásra való hivatkozás törlendő.',
-        timestamp: Date.now(),
-      }
-    ];
-
-    const evaluation = await evaluateAudit(
-      scenario.injected_errors,
-      simulatedAnnotations,
-      elapsedSec,
-      scenario.scenario_id
-    );
-
-    return res.json({
-      success: true,
-      executionState: 'SIMULATED',
-      isLive: false,
-      note: 'Simulated Gemini Execution (Calibrated benchmark engine)',
-      modelUsed: modelTier,
-      annotations: simulatedAnnotations,
-      evaluation,
-      latencyMs: Date.now() - startTime,
-    });
-  }
-
-  // P0-05 FIX: AbortController with strict 10s cancellation signal preventing background leaks!
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  if(!apiKey||apiKey==='MY_GEMINI_API_KEY')return res.status(503).json({success:false,executionState:'FAILED',isLive:false,error:'LLM provider not configured'});
 
   try {
     const ai = new GoogleGenAI({
       apiKey: apiKey,
       httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
+        timeout: 10000,
       },
     });
 
@@ -541,7 +445,7 @@ Szabályok:
 
 DOKUMENTUM:
 """
-${documentText.slice(0, 15000)}
+${documentText.slice(0, 12000)}
 """`;
 
     const generatePromise = ai.models.generateContent({
@@ -550,7 +454,7 @@ ${documentText.slice(0, 15000)}
       config: {
         systemInstruction: 'You are an adversarial AI auditor conducting zero-trust due diligence. Output must be a strictly valid JSON array of finding objects.',
         responseMimeType: 'application/json',
-        maxOutputTokens: 2048,
+        maxOutputTokens: 1024,
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -567,17 +471,7 @@ ${documentText.slice(0, 15000)}
       },
     });
 
-    // Race against AbortController timeout signal
-    const response = await Promise.race([
-      generatePromise,
-      new Promise<never>((_, reject) => {
-        controller.signal.addEventListener('abort', () => {
-          reject(new Error('AI execution aborted after 10s deadline'));
-        });
-      }),
-    ]);
-
-    clearTimeout(timeoutId);
+    const response = await generatePromise;
 
     const responseText = response.text || '[]';
     let rawFindings: any[] = [];
@@ -587,7 +481,8 @@ ${documentText.slice(0, 15000)}
       rawFindings = [];
     }
 
-    const annotations: UserAnnotation[] = rawFindings.map((item, idx) => ({
+    if(!Array.isArray(rawFindings))rawFindings=[];
+    const annotations: UserAnnotation[]=rawFindings.slice(0,12).map((item, idx) => ({
       id: `gemini-live-${Date.now()}-${idx}`,
       scenarioId: scenario.scenario_id,
       target_phrase: String(item.target_phrase || '').trim(),
@@ -617,52 +512,8 @@ ${documentText.slice(0, 15000)}
       latencyMs: Date.now() - startTime,
     });
   } catch (err: any) {
-    clearTimeout(timeoutId);
-    console.warn('Gemini Live API fallback triggered:', err?.message);
-
-    // Fallback on timeout or API error with explicit state
-    const errNumeric = scenario.injected_errors.find((e) => e.type === 'NUMERIC_MISMATCH') || scenario.injected_errors[0];
-    const errLogic = scenario.injected_errors.find((e) => e.type === 'LOGICAL_CONTRADICTION') || scenario.injected_errors[1];
-
-    const fallbackAnnotations: UserAnnotation[] = [
-      ...(errNumeric ? [{
-        id: `gemini-fallback-${Date.now()}-1`,
-        scenarioId: scenario.scenario_id,
-        target_phrase: errNumeric.target_phrase,
-        selectedType: errNumeric.type,
-        justification: `A pénzügyi adatok ellenőrzése során az állított mutató pontatlan. A levezetés ${errNumeric.validation.required_keywords.slice(0, 2).join(' ')} ellenőrzést igényel.`,
-        proposedCorrection: errNumeric.validation.expected_correction,
-        timestamp: Date.now(),
-      }] : []),
-      ...(errLogic ? [{
-        id: `gemini-fallback-${Date.now()}-2`,
-        scenarioId: scenario.scenario_id,
-        target_phrase: errLogic.target_phrase,
-        selectedType: errLogic.type,
-        justification: `Belső logikai ellentmondás az állítás és a kockázatok között: ${errLogic.validation.required_keywords.slice(0, 2).join(' ')}.`,
-        proposedCorrection: errLogic.validation.expected_correction,
-        timestamp: Date.now(),
-      }] : []),
-    ];
-
-    const elapsedSec = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-    const evaluation = await evaluateAudit(
-      scenario.injected_errors,
-      fallbackAnnotations,
-      elapsedSec,
-      scenario.scenario_id
-    );
-
-    res.json({
-      success: true,
-      executionState: 'SIMULATED',
-      isLive: false,
-      note: `Gemini Fallback: ${err?.message || 'Network / timeout condition'}`,
-      modelUsed: 'gemini-3.8-flash',
-      annotations: fallbackAnnotations,
-      evaluation,
-      latencyMs: Date.now() - startTime,
-    });
+    console.warn('Gemini request failed');
+    return res.status(502).json({success:false,executionState:'FAILED',isLive:false,error:'Live AI request failed'});
   }
 });
 
