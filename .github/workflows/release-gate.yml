@@ -1,0 +1,27 @@
+name: v7.1 Release Gate CI
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Temporary compatibility mode. The committed bun.lock belongs to an
+      # older dependency graph and cannot safely be treated as authoritative.
+      # A future gate must commit and enforce an npm package-lock.json.
+      - name: Install dependencies (no install scripts)
+        run: npm install --ignore-scripts --no-audit --no-fund --no-package-lock
+      - name: TypeScript
+        run: npm run lint
+      - name: Unit and security regressions
+        run: npm test
+      - name: Vite production bundle
+        run: npm run build
