@@ -6,7 +6,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 
 export type IdentityResult =
   | { ok: true; principal: { userId: string; tenantId: string } }
-  | { ok: false; status: 401 | 503; error: string };
+  | { ok: false; status: 401 | 403 | 503; error: string };
 
 const jwksCache = new Map<string, JWTVerifyGetKey>();
 
@@ -47,7 +47,7 @@ export async function verifySupabaseBearer(
       maxTokenAge: '1h', clockTolerance: 5,
     });
     const principal = extractTenantPrincipal(payload as Record<string, unknown>);
-    if (!principal) return { ok: false, status: 403 as 401, error: 'Account has no authorized tenant membership' };
+    if (!principal) return { ok: false, status: 403, error: 'Account has no authorized tenant membership' };
     return { ok: true, principal };
   } catch {
     return { ok: false, status: 401, error: 'Invalid or expired Supabase access token' };
