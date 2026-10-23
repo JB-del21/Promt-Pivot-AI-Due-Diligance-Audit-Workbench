@@ -414,7 +414,7 @@ ${evaluation.detailedMatches
               Szakmai & Oktatási Értékelés (Világgazdaság Szakmai Keretrendszer)
             </h3>
             <p className="text-neutral-400 leading-relaxed text-[12px]">
-              Dr. Dietz Ferenc és Dr. Aczél Petra megfogalmazása szerint: <em>„A diploma nem egy készrejelentés... Az emberi ítélőképesség értéke abban mutatkozik meg, hogy észrevesszük-e a mesterséges intelligencia által elkövetett csúsztatásokat és forráshibákat.”</em>
+              A szakmai keretrendszer Dr. Dietz Ferenc és Dr. Aczél Petra podcast-elemzéseinek (Világgazdaság, 2024) alapgondolatára épül: a diploma és az emberi ítélőképesség értéke a mesterséges intelligencia korában abban mutatkozik meg, hogy képesek vagyunk-e az automatikus kimenetek forrásait és számszaki levezetéseit kritikus szemmel auditálni.
             </p>
             <p className="text-neutral-400 leading-relaxed text-[12px]">
               {evaluation.totalScore >= 70

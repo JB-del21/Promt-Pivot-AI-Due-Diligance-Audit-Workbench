@@ -13,6 +13,7 @@ import { AuditPanel } from './components/AuditPanel';
 import { FinancialCalculatorModal } from './components/FinancialCalculatorModal';
 import { PodcastContextModal } from './components/PodcastContextModal';
 import { ScenarioSelectorModal } from './components/ScenarioSelectorModal';
+import { SystemDocumentationModal } from './components/SystemDocumentationModal';
 import { AuditReportView } from './components/AuditReportView';
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
 
   // Modals state
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false);
   const [isPodcastModalOpen, setIsPodcastModalOpen] = useState(false);
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
 
@@ -57,6 +59,7 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsCalculatorOpen(false);
+        setIsDocumentationModalOpen(false);
         setIsPodcastModalOpen(false);
         setIsScenarioModalOpen(false);
         setSelectedAnnotationId(null);
@@ -154,6 +157,7 @@ export default function App() {
         elapsedSeconds={elapsedSeconds}
         annotationCount={annotations.length}
         onOpenCalculator={() => setIsCalculatorOpen(true)}
+        onOpenDocumentationModal={() => setIsDocumentationModalOpen(true)}
         onOpenPodcastModal={() => setIsPodcastModalOpen(true)}
         onOpenScenarioSelector={() => setIsScenarioModalOpen(true)}
         onResetAudit={handleResetAudit}
@@ -245,6 +249,11 @@ export default function App() {
       <PodcastContextModal
         isOpen={isPodcastModalOpen}
         onClose={() => setIsPodcastModalOpen(false)}
+      />
+
+      <SystemDocumentationModal
+        isOpen={isDocumentationModalOpen}
+        onClose={() => setIsDocumentationModalOpen(false)}
       />
 
       <ScenarioSelectorModal

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Calculator, BookOpen, Clock, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Calculator, BookOpen, Clock, RotateCcw, CheckCircle2, FileText } from 'lucide-react';
 import type { Scenario } from '../types/audit';
 
 interface TopBarProps {
@@ -7,6 +7,7 @@ interface TopBarProps {
   elapsedSeconds: number;
   annotationCount: number;
   onOpenCalculator: () => void;
+  onOpenDocumentationModal: () => void;
   onOpenPodcastModal: () => void;
   onOpenScenarioSelector: () => void;
   onResetAudit: () => void;
@@ -20,6 +21,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   elapsedSeconds,
   annotationCount,
   onOpenCalculator,
+  onOpenDocumentationModal,
   onOpenPodcastModal,
   onOpenScenarioSelector,
   onResetAudit,
@@ -75,12 +77,21 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
 
           <button
+            onClick={onOpenDocumentationModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
+            title="Rendszerdokumentáció, kiértékelési szabályzat és korlátok"
+          >
+            <FileText className="w-3.5 h-3.5 text-neutral-400" />
+            <span className="hidden sm:inline">Rendszerleírás</span>
+          </button>
+
+          <button
             onClick={onOpenPodcastModal}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
             title="Világgazdaság podcast háttér és módszertan"
           >
             <BookOpen className="w-3.5 h-3.5 text-neutral-400" />
-            <span className="hidden sm:inline">Podcast & Módszertan</span>
+            <span className="hidden sm:inline">Podcast Háttér</span>
           </button>
 
           {/* Timer & Audit Counter */}

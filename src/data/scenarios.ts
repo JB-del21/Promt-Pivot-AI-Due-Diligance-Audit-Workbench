@@ -183,10 +183,10 @@ A regionális konverziós benchmarkok összehasonlításakor a jelentés a **Sho
       target_name: 'NovaPay Micro-Lending Platform',
       arr: '€6.8M',
       headcount: 52,
-      accounting_methodology_note: 'Tőkemegfelelési (CAR) kalkuláció: A szavatoló tőke (€5.4M) és a kockázattal súlyozott eszközérték (RWA: €45.0M) hányadosa pontosan 12.0%, amely nem azonos a modellben állított 24.5%-os szinttel.',
+      accounting_methodology_note: 'Tőkemegfelelési (Tier 1 CAR) kalkuláció: Az alapvető Tier 1 tőke (€5.4M) és a kockázattal súlyozott eszközérték (RWA: €45.0M) hányadosa pontosan 12.0%, amely nem azonos a modellben állított 24.5%-os szinttel.',
       additional_kpis: {
         'Kihelyezett hitelállomány (RWA)': '€45.0M',
-        'Szavatoló tőke (Tier 1)': '€5.40M',
+        'Tier 1 tőke': '€5.40M',
         'Nem-teljesítő hitelek (NPL)': '7.8%',
         'Céltartalék fedezettség': '62.0%',
       },
@@ -203,12 +203,12 @@ A likviditási pufferek allokációjához a menedzsment a legújabb **EBA/GL/202
         id: 'err-01',
         type: 'NUMERIC_MISMATCH',
         target_phrase: 'I. pilléres tőkemegfelelési mutató eléri a 24.5%-ot',
-        explanation: 'Számítási hiba: €5.4M szavatoló tőke és €45.0M kockázattal súlyozott eszközállomány (RWA) mellett a valódi Tőkemegfelelési Mutató (CAR) = 12.0% (€5.4M / €45.0M), nem 24.5%. A modell több mint a duplájára fújta a tőkeerőt.',
+        explanation: 'Számítási hiba: €5.4M Tier 1 tőke és €45.0M kockázattal súlyozott eszközállomány (RWA) mellett a valódi I. pilléres tőkemegfelelési mutató (Tier 1 CAR) = 12.0% (€5.4M / €45.0M), nem 24.5%. A modell több mint a duplájára fújta a tőkeerőt.',
         severity: 'CRITICAL',
         points: 35,
         validation: {
-          required_keywords: ['12%', '12.0%', '5.4', '45', 'szavatoló', 'tőkemegfelelés', 'car', 'rwa'],
-          expected_correction: '12.0% valós CAR (€5.4M Tier 1 / €45.0M RWA)',
+          required_keywords: ['12%', '12.0%', '5.4', '45', 'szavatoló', 'tőkemegfelelés', 'car', 'rwa', 'tier 1'],
+          expected_correction: '12.0% valós Tier 1 CAR (€5.4M Tier 1 / €45.0M RWA)',
           numeric_tolerance: {
             expected: 12.0,
             min: 11.5,
