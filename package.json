@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "test": "tsx --test src/utils/auditScoring.test.ts src/utils/scenarioMath.test.ts",
+    "test": "tsx --test src/utils/auditScoring.test.ts src/utils/scenarioMath.test.ts src/security/auth.test.ts src/security/reportIntegrity.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
